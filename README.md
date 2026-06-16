@@ -1,55 +1,104 @@
-# Pufferfish
+# Pufferfish 🐡
 
-A modular, command-line file compression utility powered by a custom implementation of **Huffman Coding**.
+A modular, cross-platform command-line file compression utility powered by a custom implementation of **Huffman Coding**.
 
-Built as a Discrete Mathematics final project demonstrating:
+This project was built as a Discrete Mathematics final project to demonstrate the practical application of Information Theory and algorithmic concepts.
 
-- **Huffman Trees** — binary trees constructed using a greedy algorithm
-- **Priority Queues (Min-Heaps)** — for efficient tree construction
-- **Greedy Algorithms** — always merging the two lowest-frequency nodes
-- **Prefix Codes** — variable-length codes where no code is a prefix of another
-- **Information Encoding** — replacing fixed-width bytes with variable-length bit sequences
-- **Lossless Compression** — decoded output is identical to the original input
-- **Shannon Entropy** — the theoretical minimum bits per symbol from Information Theory
+## 🎓 Mathematical Concepts Demonstrated
 
-## Building
+- **Huffman Trees** — Binary trees constructed using a greedy algorithm.
+- **Priority Queues (Min-Heaps)** — Used for efficient tree construction ($O(N \log N)$ complexity).
+- **Greedy Algorithms** — Always merging the two lowest-frequency nodes to build an optimal tree.
+- **Prefix-Free Codes** — Variable-length binary codes where no code is a prefix of another, ensuring unambiguous decoding.
+- **Information Encoding** — Replacing fixed-width 8-bit characters with variable-length bit sequences.
+- **Lossless Compression** — The mathematically guaranteed property that the decoded output is perfectly identical to the original input.
+- **Shannon Entropy** — Calculating the theoretical minimum bits per symbol ($H = -\sum p(x) \log_2 p(x)$) from Claude Shannon's Information Theory.
 
-The project uses CMake and follows a clean separation of concerns.
+---
+
+## 🛠️ Prerequisites
+
+To compile this project, you need:
+- **CMake** (version 3.16 or higher)
+- A **C++20** compatible compiler:
+  - **Linux/macOS:** GCC 10+ or Clang 10+
+  - **Windows:** MSVC (Visual Studio 2019 v16.8 or higher) or MinGW-w64
+
+---
+
+## 🏗️ Building the Project
+
+Pufferfish uses standard CMake to support multiple platforms. The build process varies slightly depending on your operating system.
+
+### 🐧 Linux & macOS
+
+Open your terminal and run:
 
 ```bash
+# 1. Generate the build files
 cmake -B build
+
+# 2. Compile the project
 cmake --build build
+
+# 3. Verify it works
+./build/puff help
 ```
 
-Requires **C++20** (minimum C++17). Tested on Linux and Windows.
+### 🪟 Windows (Visual Studio / MSVC)
 
-## Usage
+Open **Developer Command Prompt for VS** or PowerShell and run:
 
-### Compress a file
+```powershell
+# 1. Generate the build files
+cmake -B build
 
+# 2. Compile the project (Release mode is recommended for performance)
+cmake --build build --config Release
+
+# 3. Verify it works
+.\build\Release\puff.exe help
+```
+
+> **Note for Windows Users:** Unlike Linux which places the executable directly in the `build/` folder, CMake on Windows (using MSVC generators) typically places the executable inside a configuration subfolder like `build\Release\` or `build\Debug\`.
+
+---
+
+## 🚀 Usage Guide
+
+Pufferfish provides three core commands: `compress`, `extract`, and `analyze`.
+
+### 1. Compress a File
+Compresses a target file into a custom `.puff` archive.
+
+* **Linux:** `./build/puff compress samples/sample.txt`
+* **Windows:** `.\build\Release\puff.exe compress samples\sample.txt`
+
+You can also use the shorthand `c`:
 ```bash
-./build/puff compress samples/sample.txt
+./build/puff c novel.txt
 ```
+*(Produces `novel.puff` in the same directory).*
 
-Produces `samples/sample.puff`.
+### 2. Extract a File
+Restores a `.puff` archive back to its original file name and content.
 
-### Extract a file
+* **Linux:** `./build/puff extract samples/sample.puff`
+* **Windows:** `.\build\Release\puff.exe extract samples\sample.puff`
 
+You can also use the shorthand `x`:
 ```bash
-./build/puff extract samples/sample.puff
+./build/puff x novel.puff
 ```
 
-Restores `samples/sample.txt`.
+### 3. Analyze a File (Educational Feature)
+The `analyze` command is the centerpiece of the educational aspect of this project. It simulates the Huffman compression process in memory and outputs a detailed mathematical analysis without creating a file.
 
-### Analyze a file
+* **Linux:** `./build/puff analyze samples/sample.txt`
+* **Windows:** `.\build\Release\puff.exe analyze samples\sample.txt`
 
-```bash
-./build/puff analyze samples/sample.txt
-```
-
-Displays detailed Huffman statistics:
-
-```
+**Sample Output:**
+```text
 ═══════════════════════════════════════════════════
   Pufferfish — Huffman Analysis
 ═══════════════════════════════════════════════════
@@ -64,45 +113,43 @@ Displays detailed Huffman statistics:
   Average Code Length:     4.67 bits/symbol
   Compression Efficiency:  99.5%
 ───────────────────────────────────────────────────
-...
+  Top Symbols:
+    ' '    →  13.2%   Code: 101
+    'e'    →  10.0%   Code: 000
+    'a'    →   6.1%   Code: 1000
+    's'    →   6.0%   Code: 0111
+    't'    →   5.8%   Code: 0110
+═══════════════════════════════════════════════════
 ```
 
-### Shorthand
+---
 
-```bash
-./build/puff c samples/sample.txt      # compress
-./build/puff x samples/sample.puff     # extract
-./build/puff a samples/sample.txt      # analyze
-```
+## 📚 Documentation
 
-## How Huffman Coding Works
+For a deeper dive into the computer science and math behind the project:
 
-1. **Frequency Analysis** — count how often each byte appears in the input
-2. **Tree Construction** — build a binary tree using a min-heap, always merging the two least frequent nodes (greedy choice)
-3. **Code Generation** — traverse the tree: left = 0, right = 1; each leaf gets a unique prefix-free code
-4. **Encoding** — replace each input byte with its variable-length code
-5. **Decoding** — traverse the tree bit-by-bit to recover the original bytes
+- [docs/algorithm.md](docs/algorithm.md) — A step-by-step walkthrough of how Huffman Coding works, including a manual trace of building a tree and calculating entropy.
+- [docs/archive_format.md](docs/archive_format.md) — The byte-level specification of the custom `.puff` binary archive format.
 
-See [docs/algorithm.md](docs/algorithm.md) for a detailed walkthrough.
+---
 
-## .puff Archive Format
+## 📂 Project Structure
 
-See [docs/archive_format.md](docs/archive_format.md) for the byte-level specification.
-
-## Project Structure
-
-The project is broken down into 4 core modules for clean abstraction:
+The codebase is organized into 4 logical modules to strictly separate the computer science algorithms from file system I/O and user interfaces.
 
 ```text
 pufferfish/
-├── CMakeLists.txt              # Build configuration
+├── CMakeLists.txt              # Cross-platform build configuration
 ├── include/
-│   ├── huffman.hpp             # Core math, trees, and logic
-│   ├── archive.hpp             # .puff format reader/writer
-│   └── statistics.hpp          # Analysis calculations
+│   ├── huffman.hpp             # Module 1: Core math, trees, and logic
+│   ├── archive.hpp             # Module 2: .puff format reader/writer
+│   └── statistics.hpp          # Module 3: Analysis and entropy calculations
 └── src/
     ├── huffman.cpp             
     ├── archive.cpp             
     ├── statistics.cpp          
-    └── main.cpp                # CLI application
+    └── main.cpp                # Module 4: CLI application entry point
 ```
+
+## 📜 License
+This project is open-source and intended for educational purposes.
