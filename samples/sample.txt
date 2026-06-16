@@ -1,0 +1,32 @@
+Pufferfish is a command-line file compression utility powered by Huffman Coding.
+It was built as a practical demonstration of several key concepts from
+Discrete Mathematics and Information Theory.
+
+This sample file can be used to test the compression and analysis features:
+
+  pufferfish compress samples/sample.txt
+  pufferfish analyze samples/sample.txt
+  pufferfish extract samples/sample.puff
+
+The quick brown fox jumps over the lazy dog. This classic pangram contains
+every letter of the English alphabet at least once, making it a useful test
+for frequency analysis. Notice how common letters like 'e', 't', and 'o'
+appear more frequently than rare letters like 'z', 'x', and 'q'.
+
+In Huffman coding, more frequent symbols receive shorter binary codes,
+while less frequent symbols receive longer codes. This is the core idea
+behind the compression: we use fewer bits for common characters and more
+bits for rare ones, resulting in a shorter overall encoding.
+
+Here is some repeated text to demonstrate how Huffman coding handles
+common patterns and achieves better compression ratios when certain
+characters or sequences appear frequently in the input data.
+
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+abcdefghijklmnopqrstuvwxyz
+0123456789
+
+The entropy of this file measures how much information each symbol carries
+on average. A file with uniform character distribution has high entropy,
+while a file with many repeated characters has low entropy. Huffman coding
+approaches the theoretical entropy limit.
