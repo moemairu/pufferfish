@@ -2,6 +2,8 @@
 
 Dokumen ini menjelaskan **keseluruhan kode** proyek Pufferfish secara mendetail, mulai dari arsitektur, alur kerja (flow), hingga penjelasan sintaks C++ baris per baris.
 
+Seluruh penjelasan menggunakan string **`"abracadabra"`** sebagai contoh yang konsisten.
+
 ---
 
 ## Daftar Isi
@@ -27,6 +29,24 @@ Dokumen ini menjelaskan **keseluruhan kode** proyek Pufferfish secara mendetail,
 7. [Module 4: CLI Entry Point — main.cpp](#7-module-4-cli-entry-point)
 8. [Konsep Matematika dalam Kode](#8-konsep-matematika-dalam-kode)
 9. [Glossary Sintaks C++ yang Digunakan](#9-glossary-sintaks-c-yang-digunakan)
+
+---
+
+## Contoh yang Digunakan: `"abracadabra"`
+
+Sepanjang dokumen ini, kita akan menggunakan string **`"abracadabra"`** (11 karakter) sebagai contoh.
+
+### Tabel Frekuensi
+
+| Simbol | Frekuensi | Persentase |
+| :---: | :---: | :---: |
+| `a` | 5 | 45.5% |
+| `b` | 2 | 18.2% |
+| `r` | 2 | 18.2% |
+| `c` | 1 | 9.1% |
+| `d` | 1 | 9.1% |
+
+**Total:** 11 simbol, **5 simbol unik**
 
 ---
 
@@ -59,12 +79,17 @@ pufferfish/
 
 ### Diagram Dependensi Antar Modul
 
-```text
-main.cpp
-  ├── #include "archive.hpp"     →  archive.cpp
-  │       └── #include "huffman.hpp"  →  huffman.cpp
-  └── #include "statistics.hpp"  →  statistics.cpp
-            └── #include "huffman.hpp"  →  huffman.cpp
+```mermaid
+graph TD
+    MAIN["main.cpp<br/><i>CLI Entry Point</i>"] --> ARCHIVE["archive.hpp / .cpp<br/><i>Compress & Extract</i>"]
+    MAIN --> STATS["statistics.hpp / .cpp<br/><i>Analyze & Report</i>"]
+    ARCHIVE --> HUFFMAN["huffman.hpp / .cpp<br/><i>Core Algorithm</i>"]
+    STATS --> HUFFMAN
+
+    style MAIN fill:#4a90d9,color:#fff,stroke:#2a6099
+    style ARCHIVE fill:#e67e22,color:#fff,stroke:#c0692b
+    style STATS fill:#27ae60,color:#fff,stroke:#1e8449
+    style HUFFMAN fill:#8e44ad,color:#fff,stroke:#6c3483
 ```
 
 `huffman.hpp` adalah **fondasi** — semua modul lain bergantung padanya, tapi dia sendiri tidak bergantung pada modul lain.
@@ -107,120 +132,56 @@ add_executable(puff
 
 ### 3.1 Flow Compress
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  ./puff compress samples/sample.txt                         │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │  main.cpp              │
-              │  Parsing argument CLI  │
-              │  cmd = "compress"      │
-              └───────────┬────────────┘
-                          │
-                          ▼
-              ┌────────────────────────┐
-              │  ArchiveWriter::       │
-              │  compress(file_path)   │
-              │  (archive.cpp)         │
-              └───────────┬────────────┘
-                          │
-          ┌───────────────┼───────────────────┐
-          ▼               ▼                   ▼
-  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-  │ Baca file    │  │ Hitung       │  │ Bangun Huffman   │
-  │ ke memory    │  │ frekuensi    │  │ Tree (greedy)    │
-  │ (ifstream)   │  │ tiap byte    │  │ dari min-heap    │
-  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘
-         │                 │                    │
-         │                 │                    ▼
-         │                 │          ┌──────────────────┐
-         │                 │          │ Generate kode    │
-         │                 │          │ prefix-free      │
-         │                 │          │ (traversal DFS)  │
-         │                 │          └────────┬─────────┘
-         │                 │                   │
-         ▼                 ▼                   ▼
-  ┌──────────────────────────────────────────────────┐
-  │  Encoder::encode()                               │
-  │  Ganti tiap byte → kode Huffman (bit-by-bit)     │
-  │  via BitWriter                                   │
-  └──────────────────────┬───────────────────────────┘
-                         │
-                         ▼
-  ┌──────────────────────────────────────────────────┐
-  │  Tulis file .puff:                               │
-  │  [MAGIC][VER][NAMA][SIZE][FREQ TABLE][BITS]      │
-  └──────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    START["./puff compress abracadabra.txt"] --> PARSE["main.cpp<br/>Parsing argument CLI<br/>cmd = <b>compress</b>"]
+    PARSE --> CALL["ArchiveWriter::compress(file_path)<br/><i>archive.cpp</i>"]
+    CALL --> READ["Baca file ke memory<br/><code>ifstream → ostringstream</code><br/><i>raw_data = abracadabra</i>"]
+    READ --> FREQ["Hitung frekuensi tiap byte<br/><code>Encoder::calculate_frequencies()</code><br/><i>a=5, b=2, r=2, c=1, d=1</i>"]
+    FREQ --> BUILD["Bangun Huffman Tree<br/><code>HuffmanTree::build()</code><br/><i>Greedy: merge 2 terkecil</i>"]
+    BUILD --> CODES["Generate kode prefix-free<br/><code>generate_codes()</code><br/><i>a=0, r=10, b=111, c=1100, d=1101</i>"]
+    CODES --> ENCODE["Encode: ganti byte → bit<br/><code>Encoder::encode()</code><br/><i>abracadabra → 01111001100011010111100</i>"]
+    ENCODE --> WRITE["Tulis file .puff<br/><b>HEADER</b> + <b>BITSTREAM</b>"]
+    WRITE --> DONE["✅ abracadabra.puff<br/>11 bytes → 3 bytes data<br/>72.7% reduction"]
+
+    style START fill:#2c3e50,color:#fff
+    style DONE fill:#27ae60,color:#fff
 ```
 
 ### 3.2 Flow Extract
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  ./puff extract samples/sample.puff                         │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │  ArchiveReader::       │
-              │  extract(archive_path) │
-              └───────────┬────────────┘
-                          │
-          ┌───────────────┼───────────────────┐
-          ▼               ▼                   ▼
-  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-  │ Baca header  │  │ Baca tabel   │  │ Rebuild Huffman  │
-  │ magic, ver,  │  │ frekuensi    │  │ Tree (identik    │
-  │ nama, size   │  │ dari header  │  │ dengan compress) │
-  └──────────────┘  └──────┬───────┘  └────────┬─────────┘
-                           │                    │
-                           │                    ▼
-                           │          ┌──────────────────┐
-                           │          │ Decoder::decode() │
-                           │          │ Traversal pohon  │
-                           │          │ bit-by-bit via   │
-                           │          │ BitReader        │
-                           │          └────────┬─────────┘
-                           │                   │
-                           ▼                   ▼
-                    ┌──────────────────────────────────┐
-                    │  Tulis file asli (byte-by-byte)  │
-                    │  Lossless — identik 100%         │
-                    └──────────────────────────────────┘
+```mermaid
+flowchart TD
+    START["./puff extract abracadabra.puff"] --> PARSE["main.cpp<br/>cmd = <b>extract</b>"]
+    PARSE --> CALL["ArchiveReader::extract(archive_path)<br/><i>archive.cpp</i>"]
+    CALL --> MAGIC["Validasi magic number<br/><i>Cek 4 byte pertama = PUFF</i>"]
+    MAGIC --> HEADER["Baca header:<br/>• version<br/>• nama file asli<br/>• ukuran asli = 11"]
+    HEADER --> FREQTAB["Baca tabel frekuensi<br/><i>a=5, b=2, r=2, c=1, d=1</i>"]
+    FREQTAB --> REBUILD["Rebuild Huffman Tree<br/><code>tree.build(frequencies)</code><br/><i>Pohon IDENTIK dengan compress</i>"]
+    REBUILD --> READBITS["Baca bitstream terkompresi<br/><i>01111001100011010111100</i>"]
+    READBITS --> DECODE["Decode: traversal pohon<br/><code>Decoder::decode()</code><br/><i>bit 0→kiri, bit 1→kanan</i>"]
+    DECODE --> OUTPUT["Tulis file asli<br/><i>abracadabra</i>"]
+    OUTPUT --> DONE["✅ abracadabra.txt<br/>11 bytes — 100% identik"]
+
+    style START fill:#2c3e50,color:#fff
+    style DONE fill:#27ae60,color:#fff
 ```
 
 ### 3.3 Flow Analyze
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  ./puff analyze samples/sample.txt                          │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │  Statistics::analyze() │
-              │  (statistics.cpp)      │
-              └───────────┬────────────┘
-                          │
-          ┌───────────────┼───────────────────┐
-          ▼               ▼                   ▼
-  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-  │ Hitung       │  │ Bangun tree  │  │ Hitung:          │
-  │ frekuensi    │  │ + generate   │  │ • Shannon        │
-  │              │  │ codes        │  │   Entropy        │
-  │              │  │              │  │ • Avg Code Len   │
-  │              │  │              │  │ • Efficiency      │
-  └──────────────┘  └──────────────┘  └──────────────────┘
-                          │
-                          ▼
-              ┌────────────────────────┐
-              │  Statistics::          │
-              │  print_report()        │
-              │  Tampilkan tabel ke    │
-              │  stdout                │
-              └────────────────────────┘
+```mermaid
+flowchart TD
+    START["./puff analyze abracadabra.txt"] --> PARSE["main.cpp<br/>cmd = <b>analyze</b>"]
+    PARSE --> CALL["Statistics::analyze(file_path)<br/><i>statistics.cpp</i>"]
+    CALL --> READ["Baca file + hitung frekuensi"]
+    READ --> BUILD["Bangun tree + generate codes"]
+    BUILD --> ENTROPY["Hitung Shannon Entropy<br/><i>H = 2.04 bits/symbol</i>"]
+    ENTROPY --> AVGLEN["Hitung Avg Code Length<br/><i>L = 2.09 bits/symbol</i>"]
+    AVGLEN --> EFF["Hitung Efficiency<br/><i>η = H/L = 97.6%</i>"]
+    EFF --> PRINT["Statistics::print_report()<br/><i>Tampilkan tabel ke stdout</i>"]
+
+    style START fill:#2c3e50,color:#fff
+    style PRINT fill:#27ae60,color:#fff
 ```
 
 ---
@@ -242,14 +203,32 @@ using HuffmanCodeMap   = std::unordered_map<uint8_t, std::vector<bool>>;
 
 | Alias | Tipe Asli | Kegunaan |
 | :--- | :--- | :--- |
-| `ByteFrequencyMap` | `unordered_map<uint8_t, uint64_t>` | Memetakan setiap byte (0–255) ke berapa kali dia muncul dalam file. Contoh: `{'a' → 50, 'b' → 12}` |
-| `HuffmanCodeMap` | `unordered_map<uint8_t, vector<bool>>` | Memetakan setiap byte ke kode Huffman-nya (deretan bit). Contoh: `{'a' → [1,0,1], 'b' → [0,0,1,1]}` |
+| `ByteFrequencyMap` | `unordered_map<uint8_t, uint64_t>` | Memetakan setiap byte (0–255) ke berapa kali dia muncul. |
+| `HuffmanCodeMap` | `unordered_map<uint8_t, vector<bool>>` | Memetakan setiap byte ke kode Huffman-nya (deretan bit). |
+
+**Contoh `"abracadabra"`:**
+
+```text
+ByteFrequencyMap:
+  'a' (97)  → 5
+  'b' (98)  → 2
+  'r' (114) → 2
+  'c' (99)  → 1
+  'd' (100) → 1
+
+HuffmanCodeMap:
+  'a' (97)  → [0]              = "0"
+  'r' (114) → [1,0]            = "10"
+  'b' (98)  → [1,1,1]          = "111"
+  'c' (99)  → [1,1,0,0]        = "1100"
+  'd' (100) → [1,1,0,1]        = "1101"
+```
 
 **Mengapa `uint8_t`?** Karena satu byte memiliki 256 kemungkinan nilai (0–255). Tipe `uint8_t` mewakili ini secara tepat.
 
 **Mengapa `vector<bool>`?** Karena kode Huffman memiliki panjang variabel (bukan kelipatan 8). `vector<bool>` memungkinkan kita menyimpan urutan bit dengan panjang berapa pun.
 
-**Mengapa `unordered_map`?** Karena pencarian $O(1)$ rata-rata, dibandingkan `std::map` yang $O(\log n)$. Untuk tabel frekuensi yang sering diakses, ini lebih efisien.
+**Mengapa `unordered_map`?** Karena pencarian $O(1)$ rata-rata, dibandingkan `std::map` yang $O(\log n)$.
 
 ---
 
@@ -274,16 +253,22 @@ struct HuffmanNode {
 
 | Field | Tipe | Penjelasan |
 | :--- | :--- | :--- |
-| `symbol` | `uint8_t` | Byte yang diwakili node ini. Hanya bermakna untuk **leaf node** (node daun). Internal node selalu `symbol = 0`. |
-| `frequency` | `uint64_t` | Jumlah kemunculan simbol ini. Untuk internal node, nilainya adalah **jumlah frekuensi kedua anak**. |
-| `left` | `unique_ptr<HuffmanNode>` | Pointer ke anak kiri (mewakili bit `0`). `nullptr` jika leaf. |
-| `right` | `unique_ptr<HuffmanNode>` | Pointer ke anak kanan (mewakili bit `1`). `nullptr` jika leaf. |
+| `symbol` | `uint8_t` | Byte yang diwakili node ini. Hanya bermakna untuk **leaf node**. Internal node selalu `symbol = 0`. |
+| `frequency` | `uint64_t` | Jumlah kemunculan. Untuk internal node = **jumlah frekuensi kedua anak**. |
+| `left` | `unique_ptr<HuffmanNode>` | Anak kiri (mewakili bit `0`). `nullptr` jika leaf. |
+| `right` | `unique_ptr<HuffmanNode>` | Anak kanan (mewakili bit `1`). `nullptr` jika leaf. |
+
+**Contoh `"abracadabra"` — Jenis Node:**
+
+```text
+LEAF NODE:       HuffmanNode('a', 5)     → symbol=97, freq=5, left=null, right=null
+INTERNAL NODE:   HuffmanNode(left, right) → symbol=0,  freq=left.freq+right.freq
+```
 
 #### Implementasi (huffman.cpp)
 
 ```cpp
 // Constructor untuk LEAF NODE (node daun)
-// Dipanggil saat membuat node awal dari tabel frekuensi
 HuffmanNode::HuffmanNode(uint8_t sym, uint64_t freq)
     : symbol(sym), frequency(freq) {}
 ```
@@ -292,26 +277,26 @@ HuffmanNode::HuffmanNode(uint8_t sym, uint64_t freq)
 
 ```cpp
 // Constructor untuk INTERNAL NODE (node percabangan)
-// Dipanggil saat menggabungkan dua node dalam proses greedy
 HuffmanNode::HuffmanNode(std::unique_ptr<HuffmanNode> l, std::unique_ptr<HuffmanNode> r)
     : symbol(0), frequency(l->frequency + r->frequency),
       left(std::move(l)), right(std::move(r)) {}
 ```
 
-**`std::move(l)`** — `unique_ptr` tidak bisa di-copy (karena ownership tunggal). `std::move` mentransfer kepemilikan dari parameter `l` ke member `left`. Setelah move, `l` menjadi `nullptr`.
+**`std::move(l)`** — `unique_ptr` tidak bisa di-copy (kepemilikan tunggal). `std::move` mentransfer kepemilikan dari parameter ke member. Setelah move, `l` menjadi `nullptr`.
 
-**`l->frequency + r->frequency`** — Frekuensi internal node = jumlah frekuensi kedua anaknya. Ini adalah properti fundamental dari Huffman Tree.
+**`l->frequency + r->frequency`** — Frekuensi internal node = jumlah kedua anak. Ini properti fundamental Huffman Tree.
+
+**Contoh:** Saat menggabungkan `c(1)` dan `d(1)` → internal node dengan `frequency = 1 + 1 = 2`.
 
 ```cpp
-// Mengecek apakah node ini adalah daun (tidak punya anak)
 bool HuffmanNode::is_leaf() const noexcept {
     return !left && !right;
 }
 ```
 
-**`const noexcept`** — `const` berarti fungsi ini tidak mengubah state objek. `noexcept` berarti fungsi ini dijamin tidak melempar exception, sehingga compiler bisa mengoptimasi lebih agresif.
+**`const noexcept`** — `const` = tidak mengubah state objek. `noexcept` = tidak melempar exception, compiler bisa optimasi lebih agresif.
 
-**`[[nodiscard]]`** (di deklarasi) — Atribut C++17 yang memaksa pemanggil menggunakan return value. Jika kita menulis `node.is_leaf();` tanpa menyimpan hasilnya, compiler akan memberi warning.
+**`[[nodiscard]]`** (di deklarasi) — Atribut C++17 yang memaksa pemanggil menggunakan return value.
 
 ---
 
@@ -319,7 +304,106 @@ bool HuffmanNode::is_leaf() const noexcept {
 
 #### `build()` — Konstruksi Pohon (Greedy Algorithm + Priority Queue)
 
-Ini adalah **fungsi terpenting** di seluruh proyek. Fungsi ini mengimplementasikan algoritma Huffman yang merupakan **greedy algorithm** menggunakan **min-heap (priority queue)**.
+Ini adalah **fungsi terpenting** di seluruh proyek. Mengimplementasikan **greedy algorithm** menggunakan **min-heap (priority queue)**.
+
+##### Contoh Langkah-demi-Langkah dengan `"abracadabra"`
+
+```mermaid
+graph TD
+    subgraph "Langkah 0: Priority Queue Awal"
+        direction LR
+        L0_c["c:1"] ~~~ L0_d["d:1"] ~~~ L0_b["b:2"] ~~~ L0_r["r:2"] ~~~ L0_a["a:5"]
+    end
+
+    style L0_c fill:#e74c3c,color:#fff
+    style L0_d fill:#e74c3c,color:#fff
+    style L0_b fill:#f39c12,color:#fff
+    style L0_r fill:#f39c12,color:#fff
+    style L0_a fill:#2ecc71,color:#fff
+```
+
+**Langkah 1:** Ambil 2 terkecil: `c(1)` dan `d(1)` → gabungkan menjadi `[cd](2)`
+
+```mermaid
+graph TD
+    CD["[cd] : 2"]
+    CD --> C["c : 1"]
+    CD --> D["d : 1"]
+
+    style CD fill:#9b59b6,color:#fff
+    style C fill:#e74c3c,color:#fff
+    style D fill:#e74c3c,color:#fff
+```
+
+```text
+Queue: [cd](2,sym=0), b(2,sym=98), r(2,sym=114), a(5,sym=97)
+```
+
+**Langkah 2:** Ambil 2 terkecil: `[cd](2)` dan `b(2)` → gabungkan menjadi `[cd-b](4)`
+
+```mermaid
+graph TD
+    CDB["[cd-b] : 4"]
+    CDB --> CD["[cd] : 2"]
+    CDB --> B["b : 2"]
+    CD --> C["c : 1"]
+    CD --> D["d : 1"]
+
+    style CDB fill:#9b59b6,color:#fff
+    style CD fill:#9b59b6,color:#fff
+    style B fill:#f39c12,color:#fff
+    style C fill:#e74c3c,color:#fff
+    style D fill:#e74c3c,color:#fff
+```
+
+```text
+Queue: r(2), [cd-b](4), a(5)
+```
+
+**Langkah 3:** Ambil 2 terkecil: `r(2)` dan `[cd-b](4)` → gabungkan menjadi `[r-cdb](6)`
+
+```text
+Queue: a(5), [r-cdb](6)
+```
+
+**Langkah 4 (Final):** Ambil 2 terkecil: `a(5)` dan `[r-cdb](6)` → gabungkan menjadi **ROOT** `(11)`
+
+```mermaid
+graph TD
+    ROOT["ROOT : 11"]
+    ROOT -->|"0"| A["a : 5"]
+    ROOT -->|"1"| N6["(6)"]
+    N6 -->|"0"| R["r : 2"]
+    N6 -->|"1"| N4["(4)"]
+    N4 -->|"0"| N2["(2)"]
+    N4 -->|"1"| B["b : 2"]
+    N2 -->|"0"| C["c : 1"]
+    N2 -->|"1"| D["d : 1"]
+
+    style ROOT fill:#2c3e50,color:#fff
+    style A fill:#27ae60,color:#fff
+    style R fill:#f39c12,color:#fff
+    style B fill:#f39c12,color:#fff
+    style C fill:#e74c3c,color:#fff
+    style D fill:#e74c3c,color:#fff
+    style N6 fill:#9b59b6,color:#fff
+    style N4 fill:#9b59b6,color:#fff
+    style N2 fill:#9b59b6,color:#fff
+```
+
+**Hasil Kode Huffman (baca jalur dari root ke leaf):**
+
+| Simbol | Jalur | Kode | Panjang |
+| :---: | :--- | :---: | :---: |
+| `a` | kiri | `0` | 1 bit |
+| `r` | kanan → kiri | `10` | 2 bit |
+| `b` | kanan → kanan → kanan | `111` | 3 bit |
+| `c` | kanan → kanan → kiri → kiri | `1100` | 4 bit |
+| `d` | kanan → kanan → kiri → kanan | `1101` | 4 bit |
+
+**Perhatikan:** Simbol paling sering (`a`, 45.5%) mendapat kode terpendek (1 bit), sementara simbol paling jarang (`c`, `d`, 9.1%) mendapat kode terpanjang (4 bit). **Inilah inti dari Huffman Coding.**
+
+##### Kode `build()` — Penjelasan Baris per Baris
 
 ```cpp
 void HuffmanTree::build(const ByteFrequencyMap& frequencies) {
@@ -332,20 +416,23 @@ void HuffmanTree::build(const ByteFrequencyMap& frequencies) {
 
 ```cpp
     // COMPARATOR untuk priority queue (min-heap)
-    // Priority queue C++ secara default adalah MAX-heap,
+    // std::priority_queue C++ secara default adalah MAX-heap,
     // jadi kita MEMBALIK perbandingan (a > b) agar jadi MIN-heap
     auto cmp = [](const std::unique_ptr<HuffmanNode>& a,
                   const std::unique_ptr<HuffmanNode>& b) {
-        // Prioritas utama: frekuensi lebih KECIL = prioritas lebih TINGGI
+        // Prioritas utama: frekuensi LEBIH KECIL = prioritas LEBIH TINGGI
         if (a->frequency != b->frequency) return a->frequency > b->frequency;
-        // Tie-breaker: jika frekuensi sama, simbol lebih KECIL duluan
+        // Tie-breaker: jika frekuensi sama, symbol LEBIH KECIL duluan
         return a->symbol > b->symbol;
     };
 ```
 
-**Lambda `[](...)  { ... }`** — Fungsi anonim yang didefinisikan inline. `[]` adalah *capture list* (kosong = tidak menangkap variabel luar). Lambda ini digunakan sebagai custom comparator.
+**Lambda `[](...)  { ... }`** — Fungsi anonim yang didefinisikan inline. `[]` = *capture list* kosong (tidak menangkap variabel luar).
 
-**Mengapa `a > b` bukan `a < b`?** — `std::priority_queue` di C++ secara default menggunakan `std::less` yang menghasilkan **max-heap** (elemen terbesar di atas). Untuk mendapatkan **min-heap** (elemen terkecil di atas, yang kita butuhkan untuk Huffman), kita membalik perbandingannya.
+**Mengapa `a > b` bukan `a < b`?** — `std::priority_queue` default = **max-heap** (terbesar di atas). Untuk mendapat **min-heap** (terkecil di atas), kita balik.
+
+**Contoh tie-breaking dengan `"abracadabra"`:**
+- `b(freq=2, sym=98)` vs `r(freq=2, sym=114)` → frekuensi sama → sym 98 < 114 → `b` punya prioritas lebih tinggi dari `r`.
 
 ```cpp
     // Deklarasi priority queue dengan custom comparator
@@ -356,18 +443,17 @@ void HuffmanTree::build(const ByteFrequencyMap& frequencies) {
     > pq(cmp);
 ```
 
-**`decltype(cmp)`** — Keyword C++11 yang menghasilkan tipe dari ekspresi `cmp`. Karena lambda memiliki tipe unik yang tidak bisa ditulis manual, kita gunakan `decltype` untuk mendapatkannya.
+**`decltype(cmp)`** — Keyword C++11 yang menghasilkan tipe dari ekspresi `cmp`. Lambda memiliki tipe unik yang tidak bisa ditulis manual, jadi gunakan `decltype`.
 
 ```cpp
     // FIX DETERMINISME: Salin ke vector dan sort berdasarkan symbol
     // SEBELUM push ke priority queue.
     //
     // MENGAPA? unordered_map tidak menjamin urutan iterasi.
-    // Saat compress, map diisi dari scan file (urutan kemunculan pertama).
-    // Saat extract, map diisi dari header arsip (urutan berbeda).
-    // Urutan push yang berbeda menghasilkan tie-breaking berbeda
-    // untuk internal node dengan frekuensi sama, menghasilkan
-    // pohon Huffman yang BERBEDA meskipun data frekuensinya IDENTIK.
+    // Saat compress: map diisi dari scan file (urutan kemunculan pertama).
+    // Saat extract: map diisi dari header arsip (urutan berbeda).
+    // Urutan push berbeda → tie-breaking internal node berbeda → pohon BERBEDA
+    // → decode gagal!
     std::vector<std::pair<uint8_t, uint64_t>> sorted_freq(
         frequencies.begin(), frequencies.end()
     );
@@ -375,9 +461,15 @@ void HuffmanTree::build(const ByteFrequencyMap& frequencies) {
               [](const auto& a, const auto& b) { return a.first < b.first; });
 ```
 
-**`frequencies.begin(), frequencies.end()`** — Range constructor: menyalin semua elemen dari `unordered_map` ke `vector`.
+**Contoh `"abracadabra"`:**
 
-**`a.first < b.first`** — Mengurutkan berdasarkan `symbol` (key) secara ascending. Ini memastikan urutan push **selalu sama** terlepas dari bagaimana `unordered_map` menyimpan datanya secara internal.
+```text
+SEBELUM sort (dari unordered_map, urutan ACAK):
+  [('r',2), ('a',5), ('d',1), ('b',2), ('c',1)]   ← bisa berbeda tiap kali!
+
+SESUDAH sort (berdasarkan symbol ascending):
+  [('a',5), ('b',2), ('c',1), ('d',1), ('r',2)]    ← SELALU urutan ini
+```
 
 ```cpp
     // Push semua leaf node ke priority queue (dalam urutan deterministik)
@@ -386,9 +478,9 @@ void HuffmanTree::build(const ByteFrequencyMap& frequencies) {
     }
 ```
 
-**`const auto& [sym, freq]`** — *Structured binding* (C++17). Secara otomatis meng-decompose `std::pair` menjadi dua variabel `sym` dan `freq`.
+**`const auto& [sym, freq]`** — *Structured binding* (C++17). Decompose `std::pair` menjadi dua variabel.
 
-**`std::make_unique<HuffmanNode>(sym, freq)`** — Membuat `unique_ptr<HuffmanNode>` baru di heap. Ini lebih aman dan efisien daripada `new HuffmanNode(sym, freq)`.
+**`std::make_unique<HuffmanNode>(sym, freq)`** — Membuat `unique_ptr<HuffmanNode>` baru di heap. Lebih aman dan efisien daripada `new`.
 
 ```cpp
     // === INTI ALGORITMA GREEDY ===
@@ -405,16 +497,28 @@ void HuffmanTree::build(const ByteFrequencyMap& frequencies) {
     }
 ```
 
-**Mengapa `const_cast`?** — `pq.top()` mengembalikan `const&`. Namun, kita perlu `std::move` dari elemen tersebut (karena `unique_ptr` tidak bisa di-copy). `const_cast` menghapus `const` agar `std::move` bisa bekerja. Ini aman karena kita langsung `pop()` setelahnya.
+**Mengapa `const_cast`?** — `pq.top()` return `const&`, tapi kita perlu `std::move`. `const_cast` menghapus `const`. Aman karena langsung `pop()` setelahnya.
 
-**Greedy Choice:** Pada setiap iterasi, kita **selalu** mengambil dua node dengan frekuensi terkecil. Ini adalah *greedy choice* yang terbukti secara matematis menghasilkan kode **optimal** (tidak ada prefix code lain yang menghasilkan rata-rata panjang kode lebih pendek).
+**Greedy Choice:** Setiap iterasi **selalu** mengambil 2 node terkecil. Ini terbukti secara matematis menghasilkan kode **optimal**.
+
+**Trace `"abracadabra"` (ringkasan):**
+
+```text
+Queue awal:     c(1) d(1) b(2) r(2) a(5)       ← 5 node
+Iterasi 1:      [cd](2) b(2) r(2) a(5)          ← 4 node, gabung c+d
+Iterasi 2:      r(2) [cd-b](4) a(5)             ← 3 node, gabung [cd]+b
+Iterasi 3:      a(5) [r-cdb](6)                 ← 2 node, gabung r+[cd-b]
+Iterasi 4:      ROOT(11)                         ← 1 node, gabung a+[r-cdb]
+```
 
 ```cpp
-    // Node terakhir yang tersisa adalah ROOT dari pohon Huffman
+    // Node terakhir yang tersisa adalah ROOT
     root_ = std::move(const_cast<std::unique_ptr<HuffmanNode>&>(pq.top()));
     pq.pop();
 }
 ```
+
+---
 
 #### `generate_codes()` — Menghasilkan Kode Prefix-Free
 
@@ -425,8 +529,7 @@ HuffmanCodeMap HuffmanTree::generate_codes() const {
 
     std::vector<bool> current_code;
 
-    // Edge case: jika pohon hanya punya satu leaf (hanya 1 simbol unik)
-    // Berikan kode "0" secara manual
+    // Edge case: pohon hanya 1 leaf (1 simbol unik, misal: "aaaa")
     if (root_->is_leaf()) {
         codes[root_->symbol] = {false};  // false = bit 0
         return codes;
@@ -437,7 +540,7 @@ HuffmanCodeMap HuffmanTree::generate_codes() const {
 }
 ```
 
-**`root_.get()`** — `unique_ptr::get()` mengembalikan raw pointer tanpa melepas kepemilikan. Digunakan karena fungsi rekursif hanya perlu *observe*, bukan *own* node.
+**`root_.get()`** — `unique_ptr::get()` return raw pointer tanpa melepas kepemilikan. Fungsi rekursif hanya perlu *observe*.
 
 ```cpp
 // Fungsi rekursif DFS (Depth-First Search) untuk traversal pohon
@@ -457,7 +560,7 @@ void HuffmanTree::generate_codes_impl(
     // Traversal ke KIRI = tambahkan bit 0
     current_code.push_back(false);
     generate_codes_impl(node->left.get(), current_code, codes);
-    current_code.pop_back();  // Backtrack (hapus bit terakhir)
+    current_code.pop_back();  // Backtrack
 
     // Traversal ke KANAN = tambahkan bit 1
     current_code.push_back(true);
@@ -466,24 +569,71 @@ void HuffmanTree::generate_codes_impl(
 }
 ```
 
-**Teknik Backtracking:** `push_back` menambah bit sebelum masuk ke subtree, `pop_back` menghapusnya setelah kembali. Dengan cara ini, `current_code` selalu berisi jalur dari root ke node saat ini.
+**Teknik Backtracking:** `push_back` menambah bit sebelum masuk subtree, `pop_back` menghapusnya setelah kembali. `current_code` selalu berisi jalur dari root ke node saat ini.
 
-**Properti Prefix-Free:** Karena kode hanya di-assign ke **leaf node**, dan tidak ada leaf yang merupakan ancestor dari leaf lain, maka tidak ada kode yang merupakan prefix dari kode lain. Ini menjamin **decoding yang unambiguous**.
+**Trace DFS pada pohon `"abracadabra"`:**
+
+```mermaid
+graph TD
+    ROOT["ROOT : 11"] -->|"push 0"| A["a : 5<br/>✅ code = <b>0</b>"]
+    ROOT -->|"push 1"| N6["(6)"]
+    N6 -->|"push 0"| R["r : 2<br/>✅ code = <b>10</b>"]
+    N6 -->|"push 1"| N4["(4)"]
+    N4 -->|"push 0"| N2["(2)"]
+    N4 -->|"push 1"| B["b : 2<br/>✅ code = <b>111</b>"]
+    N2 -->|"push 0"| C["c : 1<br/>✅ code = <b>1100</b>"]
+    N2 -->|"push 1"| D["d : 1<br/>✅ code = <b>1101</b>"]
+
+    style A fill:#27ae60,color:#fff
+    style R fill:#27ae60,color:#fff
+    style B fill:#27ae60,color:#fff
+    style C fill:#27ae60,color:#fff
+    style D fill:#27ae60,color:#fff
+```
+
+```text
+Traversal DFS (depth-first, left-first):
+
+1. ROOT → kiri → LEAF 'a'
+   current_code = [0]
+   codes['a'] = [0]  ← simpan
+   pop_back → current_code = []
+
+2. ROOT → kanan → (6) → kiri → LEAF 'r'
+   current_code = [1, 0]
+   codes['r'] = [1,0]  ← simpan
+   pop_back → current_code = [1]
+
+3. ROOT → kanan → (6) → kanan → (4) → kiri → (2) → kiri → LEAF 'c'
+   current_code = [1, 1, 0, 0]
+   codes['c'] = [1,1,0,0]  ← simpan
+   pop_back → current_code = [1, 1, 0]
+
+4. ROOT → kanan → (6) → kanan → (4) → kiri → (2) → kanan → LEAF 'd'
+   current_code = [1, 1, 0, 1]
+   codes['d'] = [1,1,0,1]  ← simpan
+   pop_back → current_code = [1, 1, 0]
+   pop_back → current_code = [1, 1]
+
+5. ROOT → kanan → (6) → kanan → (4) → kanan → LEAF 'b'
+   current_code = [1, 1, 1]
+   codes['b'] = [1,1,1]  ← simpan
+```
+
+**Properti Prefix-Free:** Kode hanya di-assign ke **leaf node**. Tidak ada leaf yang merupakan ancestor dari leaf lain → tidak ada kode yang merupakan prefix dari kode lain → **decoding unambiguous**.
+
+---
 
 #### Fungsi Utilitas Pohon
 
 ```cpp
-// Menghitung tinggi pohon secara rekursif
 int HuffmanTree::height_impl(const HuffmanNode* node) noexcept {
     if (!node) return 0;
     if (node->is_leaf()) return 1;
-    return 1 + std::max(
-        height_impl(node->left.get()),
-        height_impl(node->right.get())
-    );
+    return 1 + std::max(height_impl(node->left.get()),
+                        height_impl(node->right.get()));
 }
 
-// Menghitung jumlah total node secara rekursif
 int HuffmanTree::node_count_impl(const HuffmanNode* node) noexcept {
     if (!node) return 0;
     return 1 + node_count_impl(node->left.get())
@@ -491,13 +641,15 @@ int HuffmanTree::node_count_impl(const HuffmanNode* node) noexcept {
 }
 ```
 
-Kedua fungsi menggunakan **rekursi** yang merupakan teknik natural untuk traversal tree. Kompleksitas keduanya $O(n)$ dimana $n$ = jumlah node.
+**Contoh `"abracadabra"`:**
+- **Tinggi** = 5 (jalur terpanjang: ROOT → (6) → (4) → (2) → c/d)
+- **Jumlah node** = 9 (5 leaf + 4 internal)
 
 ---
 
 ### 4.4 BitWriter & BitReader
 
-Karena kode Huffman memiliki panjang variabel (misalnya 3 bit, 5 bit, 7 bit), kita tidak bisa langsung menulis ke file yang bekerja dalam satuan **byte** (8 bit). Kelas `BitWriter` dan `BitReader` menjembatani gap ini.
+Kode Huffman punya panjang variabel (misal 1 bit, 3 bit, 4 bit). File hanya bisa menyimpan **byte** (8 bit). Kelas ini menjembatani gap tersebut.
 
 #### BitWriter — Menulis Bit per Bit ke Output Stream
 
@@ -506,20 +658,18 @@ class BitWriter {
 private:
     std::ostream& out_;          // Reference ke output stream
     uint8_t  buffer_     = 0;    // Buffer 8-bit yang sedang diisi
-    int      bit_count_  = 0;    // Berapa bit sudah terisi di buffer
+    int      bit_count_  = 0;    // Berapa bit sudah terisi
     uint64_t bytes_written_ = 0; // Counter total byte yang ditulis
 };
 ```
 
-**`std::ostream& out_`** — Reference (bukan pointer, bukan copy). Ini berarti `BitWriter` tidak memiliki stream-nya, hanya merujuk ke stream yang sudah ada. Reference harus diinisialisasi saat konstruksi dan tidak bisa di-reassign.
-
 ```cpp
 void BitWriter::write_bit(bool bit) {
-    // Geser buffer ke kiri 1 posisi, lalu masukkan bit baru di posisi LSB
+    // Geser buffer ke kiri 1 posisi, masukkan bit baru di LSB
     buffer_ = static_cast<uint8_t>((buffer_ << 1) | (bit ? 1 : 0));
     ++bit_count_;
 
-    // Jika buffer sudah penuh (8 bit), tulis ke stream
+    // Jika buffer penuh (8 bit), tulis ke stream
     if (bit_count_ == 8) {
         out_.put(static_cast<char>(buffer_));
         ++bytes_written_;
@@ -529,48 +679,64 @@ void BitWriter::write_bit(bool bit) {
 }
 ```
 
-**Visualisasi proses buffer:**
-```text
-Menulis bit: 1, 0, 1, 1, 0, 0, 1, 0
+**Contoh `"abracadabra"` — Proses Encoding ke Bit:**
 
-Step 1: buffer = 00000001  (bit_count = 1)
-Step 2: buffer = 00000010  (bit_count = 2)
-Step 3: buffer = 00000101  (bit_count = 3)
-Step 4: buffer = 00001011  (bit_count = 4)
-Step 5: buffer = 00010110  (bit_count = 5)
-Step 6: buffer = 00101100  (bit_count = 6)
-Step 7: buffer = 01011001  (bit_count = 7)
-Step 8: buffer = 10110010  (bit_count = 8) → TULIS KE STREAM → reset
+```text
+Input:  a      b      r      a      c         a      d         a      b      r      a
+Kode:   0      111    10     0      1100      0      1101      0      111    10     0
+Bits:   0      111    10     0      1100      0      1101      0      111    10     0
 ```
 
-**`static_cast<uint8_t>(...)`** — Konversi tipe eksplisit. Tanpa cast, operasi bitwise pada tipe kecil (uint8_t) akan di-promote ke `int` oleh compiler. Cast memastikan hasilnya kembali ke `uint8_t`.
+**Visualisasi proses buffer byte-per-byte:**
+
+```text
+Bitstream lengkap: 0 1 1 1 1 0 0 1 | 1 0 0 0 1 1 0 1 | 0 1 1 1 1 0 0 [pad]
+                   ─────────────────  ─────────────────  ─────────────────────
+                       Byte 1             Byte 2             Byte 3
+                       = 0x79             = 0x8D             = 0x78 (1 bit pad)
+
+Buffer step-by-step untuk Byte 1:
+  bit 0: buffer = 00000000  →  (0 << 1) | 0 = 00000000  (bit_count=1)
+  bit 1: buffer = 00000000  →  (0 << 1) | 1 = 00000001  (bit_count=2)
+  bit 1: buffer = 00000001  →  (1 << 1) | 1 = 00000011  (bit_count=3)
+  bit 1: buffer = 00000011  →  (3 << 1) | 1 = 00000111  (bit_count=4)
+  bit 1: buffer = 00000111  →  (7 << 1) | 1 = 00001111  (bit_count=5)
+  bit 0: buffer = 00001111  →  (15<< 1) | 0 = 00011110  (bit_count=6)
+  bit 0: buffer = 00011110  →  (30<< 1) | 0 = 00111100  (bit_count=7)
+  bit 1: buffer = 00111100  →  (60<< 1) | 1 = 01111001  (bit_count=8) → TULIS!
+  Byte 1 = 0x79 = 01111001
+```
 
 ```cpp
 uint8_t BitWriter::flush() {
     if (bit_count_ == 0) return 0;  // Tidak ada sisa bit
-
-    // Hitung berapa bit padding yang ditambahkan
     uint8_t padding = static_cast<uint8_t>(8 - bit_count_);
-
-    // Geser sisa bit ke posisi MSB dan isi sisanya dengan 0
     buffer_ = static_cast<uint8_t>(buffer_ << padding);
-
     out_.put(static_cast<char>(buffer_));
     ++bytes_written_;
     buffer_    = 0;
     bit_count_ = 0;
-
-    return padding;  // Informasi ini disimpan di header .puff
+    return padding;
 }
 ```
 
-**Mengapa perlu padding?** Karena file hanya bisa menyimpan byte utuh. Jika data terkompresi berakhir di tengah-tengah byte (misalnya hanya 5 bit terisi), kita harus menambah 3 bit padding (nol) agar menjadi 8 bit penuh. Jumlah padding disimpan di header arsip agar decoder tahu kapan harus berhenti.
+**Contoh `"abracadabra"` — Flush Byte Terakhir:**
+
+```text
+Setelah menulis 23 bit, buffer berisi 7 bit: 0111100
+bit_count = 7, padding = 8 - 7 = 1
+
+Geser kiri 1 posisi: 0111100 → 01111000 = 0x78
+Tulis 0x78 ke stream.
+
+Hasil: 3 byte terkompresi: [0x79, 0x8D, 0x78]
+padding_bits = 1  (disimpan di header .puff agar decoder tahu 1 bit terakhir bukan data)
+```
 
 #### BitReader — Membaca Bit per Bit dari Input Stream
 
 ```cpp
 std::optional<bool> BitReader::read_bit() {
-    // Jika buffer kosong, baca byte baru dari stream
     if (bits_remaining_ == 0) {
         char ch;
         if (!in_.get(ch)) return std::nullopt;  // EOF
@@ -578,14 +744,28 @@ std::optional<bool> BitReader::read_bit() {
         bits_remaining_ = 8;
     }
     --bits_remaining_;
-    // Ekstrak bit dari posisi MSB
     return (buffer_ >> bits_remaining_) & 1;
 }
 ```
 
-**`std::optional<bool>`** — Tipe C++17 yang bisa berisi `bool` atau *nothing* (`std::nullopt`). Digunakan untuk menandakan EOF dengan elegan tanpa perlu flag atau exception.
+**`std::optional<bool>`** — Tipe C++17 yang bisa berisi `bool` atau *nothing* (`std::nullopt`). Menandakan EOF dengan elegan.
 
-**`(buffer_ >> bits_remaining_) & 1`** — Mengekstrak satu bit dari posisi `bits_remaining_`. Operasi `>> n` menggeser bit ke kanan sebanyak `n`, lalu `& 1` mengambil hanya bit paling kanan (LSB).
+**Contoh membaca Byte 1 (0x79 = 01111001):**
+
+```text
+buffer = 01111001, bits_remaining = 8
+
+read_bit() → bits_remaining=7, (01111001 >> 7) & 1 = 0   ← bit pertama
+read_bit() → bits_remaining=6, (01111001 >> 6) & 1 = 1
+read_bit() → bits_remaining=5, (01111001 >> 5) & 1 = 1
+read_bit() → bits_remaining=4, (01111001 >> 4) & 1 = 1
+read_bit() → bits_remaining=3, (01111001 >> 3) & 1 = 1
+read_bit() → bits_remaining=2, (01111001 >> 2) & 1 = 0
+read_bit() → bits_remaining=1, (01111001 >> 1) & 1 = 0
+read_bit() → bits_remaining=0, (01111001 >> 0) & 1 = 1
+
+Hasil: 0,1,1,1,1,0,0,1 ← sama persis dengan yang ditulis!
+```
 
 ---
 
@@ -597,7 +777,6 @@ std::optional<bool> BitReader::read_bit() {
 ByteFrequencyMap Encoder::calculate_frequencies(std::istream& input) {
     ByteFrequencyMap freq;
     char ch;
-    // Baca byte demi byte dan hitung kemunculannya
     while (input.get(ch)) {
         ++freq[static_cast<uint8_t>(ch)];
     }
@@ -605,27 +784,36 @@ ByteFrequencyMap Encoder::calculate_frequencies(std::istream& input) {
 }
 ```
 
-**`input.get(ch)`** — Membaca satu karakter dari stream. Mengembalikan referensi ke stream itu sendiri, yang bernilai `true` jika berhasil, `false` jika EOF.
+**Contoh `"abracadabra"`:**
 
-**`++freq[static_cast<uint8_t>(ch)]`** — `unordered_map::operator[]` akan membuat entry baru dengan value `0` jika key belum ada. Kemudian `++` menambah 1. Ini adalah idiom standar C++ untuk menghitung frekuensi.
+```text
+Baca 'a' → freq = {a:1}
+Baca 'b' → freq = {a:1, b:1}
+Baca 'r' → freq = {a:1, b:1, r:1}
+Baca 'a' → freq = {a:2, b:1, r:1}
+Baca 'c' → freq = {a:2, b:1, r:1, c:1}
+Baca 'a' → freq = {a:3, b:1, r:1, c:1}
+Baca 'd' → freq = {a:3, b:1, r:1, c:1, d:1}
+Baca 'a' → freq = {a:4, b:1, r:1, c:1, d:1}
+Baca 'b' → freq = {a:4, b:2, r:1, c:1, d:1}
+Baca 'r' → freq = {a:4, b:2, r:2, c:1, d:1}
+Baca 'a' → freq = {a:5, b:2, r:2, c:1, d:1}  ← HASIL AKHIR
+```
 
-**Kompleksitas:** $O(n)$ dimana $n$ = jumlah byte dalam file. Setiap byte di-lookup dan di-increment dalam $O(1)$ rata-rata.
+**`++freq[static_cast<uint8_t>(ch)]`** — `operator[]` membuat entry baru (value=0) jika key belum ada, lalu `++` menambah 1. Idiom standar C++ untuk frequency counting.
 
 #### Encoder::encode()
 
 ```cpp
 EncodeResult Encoder::encode(
-    std::istream& input,
-    std::ostream& output,
+    std::istream& input, std::ostream& output,
     const HuffmanCodeMap& codes
 ) {
     BitWriter writer(output);
     char ch;
     while (input.get(ch)) {
-        // Cari kode Huffman untuk byte ini
         auto it = codes.find(static_cast<uint8_t>(ch));
         if (it != codes.end()) {
-            // Tulis semua bit dari kode Huffman
             writer.write_bits(it->second);
         }
     }
@@ -634,31 +822,43 @@ EncodeResult Encoder::encode(
 }
 ```
 
-**`codes.find(...)` vs `codes[...]`** — `find` tidak memodifikasi map (mengembalikan iterator), sementara `operator[]` bisa insert entry baru. Karena `codes` adalah `const`, kita harus menggunakan `find`.
+**Contoh `"abracadabra"`:**
 
-**`it->second`** — Iterator ke `unordered_map` menunjuk ke `std::pair<const Key, Value>`. `it->second` adalah value-nya, yaitu `vector<bool>` berisi kode Huffman.
+```text
+Baca 'a' → cari codes['a'] = [0]        → tulis bit: 0
+Baca 'b' → cari codes['b'] = [1,1,1]    → tulis bit: 1,1,1
+Baca 'r' → cari codes['r'] = [1,0]      → tulis bit: 1,0
+Baca 'a' → cari codes['a'] = [0]        → tulis bit: 0
+Baca 'c' → cari codes['c'] = [1,1,0,0]  → tulis bit: 1,1,0,0
+Baca 'a' → cari codes['a'] = [0]        → tulis bit: 0
+Baca 'd' → cari codes['d'] = [1,1,0,1]  → tulis bit: 1,1,0,1
+Baca 'a' → cari codes['a'] = [0]        → tulis bit: 0
+Baca 'b' → cari codes['b'] = [1,1,1]    → tulis bit: 1,1,1
+Baca 'r' → cari codes['r'] = [1,0]      → tulis bit: 1,0
+Baca 'a' → cari codes['a'] = [0]        → tulis bit: 0
 
-**`return {writer.bytes_written(), padding}`** — *Aggregate initialization* C++11. Membuat `EncodeResult` secara langsung dari dua nilai tanpa perlu menyebut nama struct.
+Total: 23 bits → 3 bytes + 1 bit padding
+```
+
+**`return {writer.bytes_written(), padding}`** — *Aggregate initialization* C++11. Membuat `EncodeResult` langsung tanpa menyebut nama struct.
 
 #### Decoder::decode()
 
 ```cpp
 void Decoder::decode(
-    std::istream& input,
-    std::ostream& output,
-    const HuffmanTree& tree,
-    uint64_t original_size
+    std::istream& input, std::ostream& output,
+    const HuffmanTree& tree, uint64_t original_size
 ) {
     if (original_size == 0 || tree.empty()) return;
 
     const HuffmanNode* root = tree.get_root();
     BitReader reader(input);
 
-    // Edge case: hanya satu simbol unik
+    // Edge case: hanya satu simbol unik (misal "aaaa")
     if (root->is_leaf()) {
         for (uint64_t i = 0; i < original_size; ++i) {
             output.put(static_cast<char>(root->symbol));
-            reader.read_bit();  // Konsumsi bit (meski tidak dibutuhkan)
+            reader.read_bit();
         }
         return;
     }
@@ -671,36 +871,61 @@ void Decoder::decode(
         if (!bit.has_value()) {
             throw std::runtime_error("Unexpected end of bitstream");
         }
-
-        // bit = 0 → ke kiri, bit = 1 → ke kanan
+        // bit=0 → kiri, bit=1 → kanan
         current = bit.value() ? current->right.get() : current->left.get();
-
         if (!current) {
             throw std::runtime_error("Invalid Huffman tree path");
         }
-
-        // Jika mencapai leaf, outputkan simbol dan kembali ke root
         if (current->is_leaf()) {
             output.put(static_cast<char>(current->symbol));
             ++decoded;
-            current = root;  // Reset ke root untuk decode simbol berikutnya
+            current = root;  // Reset untuk simbol berikutnya
         }
     }
 }
 ```
 
-**Proses Decoding (Traversal Pohon):**
+**Contoh `"abracadabra"` — Trace Decoding:**
 
-Decoder membaca bitstream bit-per-bit dan berjalan menuruni pohon Huffman:
-- Bit `0` → belok kiri
-- Bit `1` → belok kanan
-- Saat mencapai **leaf node** → outputkan simbol, kembali ke root
+```text
+Bitstream: 0 1 1 1 1 0 0 1 1 0 0 0 1 1 0 1 0 1 1 1 1 0 0
 
-Ini bekerja karena kode Huffman bersifat **prefix-free**: tidak ada kode yang merupakan awalan dari kode lain, sehingga setiap kali kita mencapai leaf, kita tahu pasti kita telah selesai membaca satu simbol utuh.
+Decode simbol ke-1:
+  bit=0 → ROOT kiri → LEAF 'a' ✅ → output 'a', reset ke ROOT
 
-**`bit.value()`** — Mengambil nilai `bool` dari `std::optional<bool>`. Hanya aman dipanggil setelah `has_value()` bernilai `true`.
+Decode simbol ke-2:
+  bit=1 → ROOT kanan → (6)
+  bit=1 → (6) kanan → (4)
+  bit=1 → (4) kanan → LEAF 'b' ✅ → output 'b', reset ke ROOT
 
-**`original_size`** — Kritis untuk mengetahui kapan berhenti. Tanpa ini, decoder akan terus membaca padding bits di akhir dan menghasilkan byte sampah.
+Decode simbol ke-3:
+  bit=1 → ROOT kanan → (6)
+  bit=0 → (6) kiri → LEAF 'r' ✅ → output 'r', reset ke ROOT
+
+Decode simbol ke-4:
+  bit=0 → ROOT kiri → LEAF 'a' ✅ → output 'a', reset ke ROOT
+
+Decode simbol ke-5:
+  bit=1 → ROOT kanan → (6)
+  bit=1 → (6) kanan → (4)
+  bit=0 → (4) kiri → (2)
+  bit=0 → (2) kiri → LEAF 'c' ✅ → output 'c', reset ke ROOT
+
+Decode simbol ke-6:
+  bit=0 → ROOT kiri → LEAF 'a' ✅ → output 'a'
+
+Decode simbol ke-7:
+  bit=1 → ROOT kanan → (6)
+  bit=1 → (6) kanan → (4)
+  bit=0 → (4) kiri → (2)
+  bit=1 → (2) kanan → LEAF 'd' ✅ → output 'd'
+
+  ... (lanjut sampai decoded = 11 = original_size)
+
+Hasil: a b r a c a d a b r a = "abracadabra" ← IDENTIK! ✅
+```
+
+**`original_size`** — Kritis untuk tahu kapan berhenti. Tanpa ini, decoder akan membaca padding bit di akhir dan menghasilkan byte sampah.
 
 ---
 
@@ -708,32 +933,67 @@ Ini bekerja karena kode Huffman bersifat **prefix-free**: tidak ada kode yang me
 
 File: `include/archive.hpp` (deklarasi) + `src/archive.cpp` (implementasi)
 
-Modul ini menangani **serialisasi** (menulis data terstruktur ke file biner) dan **deserialisasi** (membaca kembali).
+Modul ini menangani **serialisasi** (menulis data ke file biner) dan **deserialisasi** (membaca kembali).
 
 ---
 
 ### 5.1 Format Biner .puff
 
+```mermaid
+block-beta
+    columns 3
+
+    block:header:3
+        columns 3
+        A["MAGIC<br/>4 byte<br/><b>PUFF</b>"]
+        B["VERSION<br/>2 byte<br/><b>01 00</b>"]
+        C["FILENAME LEN<br/>2 byte<br/><b>15 00</b>"]
+    end
+
+    block:header2:3
+        columns 3
+        D["FILENAME<br/>N byte<br/><b>abracadabra.txt</b>"]
+        E["ORIGINAL SIZE<br/>8 byte<br/><b>0B 00 ... 00</b>"]
+        F["UNIQUE SYMBOLS<br/>2 byte<br/><b>05 00</b>"]
+    end
+
+    block:freq:3
+        columns 2
+        G["FREQ TABLE<br/>9 × 5 = 45 byte<br/><b>sym:freq pairs</b>"]
+        H["PADDING<br/>1 byte<br/><b>01</b>"]
+    end
+
+    block:data:3
+        I["COMPRESSED DATA<br/>3 byte<br/><b>79 8D 78</b>"]:3
+    end
+
+    style A fill:#3498db,color:#fff
+    style B fill:#3498db,color:#fff
+    style C fill:#3498db,color:#fff
+    style D fill:#9b59b6,color:#fff
+    style E fill:#9b59b6,color:#fff
+    style F fill:#9b59b6,color:#fff
+    style G fill:#e67e22,color:#fff
+    style H fill:#e67e22,color:#fff
+    style I fill:#27ae60,color:#fff
+```
+
+**Contoh `"abracadabra"` — Isi file `.puff` (hex dump):**
+
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│                     HEADER                                   │
-├──────────┬───────────┬───────────────────────────────────────┤
-│ Offset   │ Ukuran    │ Isi                                   │
-├──────────┼───────────┼───────────────────────────────────────┤
-│ 0x00     │ 4 byte    │ Magic Number: "PUFF" (identifikasi)   │
-│ 0x04     │ 1 byte    │ Version Major (0x01)                  │
-│ 0x05     │ 1 byte    │ Version Minor (0x00)                  │
-│ 0x06     │ 2 byte    │ Panjang nama file asli (little-endian)│
-│ 0x08     │ N byte    │ Nama file asli (string UTF-8)         │
-│ 0x08+N   │ 8 byte    │ Ukuran file asli (little-endian)      │
-│          │ 2 byte    │ Jumlah simbol unik                    │
-│          │ 9×S byte  │ Tabel frekuensi: S × (1 + 8) byte    │
-│          │ 1 byte    │ Jumlah padding bits (0–7)             │
-├──────────┼───────────┼───────────────────────────────────────┤
-│                     DATA                                     │
-├──────────┼───────────┼───────────────────────────────────────┤
-│          │ sisanya   │ Bitstream data terkompresi             │
-└──────────┴───────────┴───────────────────────────────────────┘
+Offset  Hex                                        ASCII
+──────  ─────────────────────────────────────────  ──────────
+0x0000  50 55 46 46                                PUFF          ← Magic
+0x0004  01 00                                      ..            ← Version 1.0
+0x0006  0F 00                                      ..            ← Filename len = 15
+0x0008  61 62 72 61 63 61 64 61 62 72 61 2E 74 78 74  abracadabra.txt
+0x0017  0B 00 00 00 00 00 00 00                    ........      ← Original size = 11
+0x001F  05 00                                      ..            ← 5 simbol unik
+0x0021  61 05 00 00 00 00 00 00 00                 a........     ← 'a' freq=5
+0x002A  62 02 00 00 00 00 00 00 00                 b........     ← 'b' freq=2
+        ...                                                       ← (r, c, d juga)
+0x????  01                                         .             ← 1 bit padding
+0x????  79 8D 78                                   y.x           ← Data terkompresi
 ```
 
 ### Konstanta Format
@@ -744,41 +1004,51 @@ inline constexpr uint8_t PUFF_VERSION_MAJOR = 0x01;
 inline constexpr uint8_t PUFF_VERSION_MINOR = 0x00;
 ```
 
-**`inline constexpr`** — `constexpr` berarti nilai diketahui saat kompilasi. `inline` memungkinkan definisi di file header tanpa melanggar ODR (One Definition Rule) saat di-include dari banyak `.cpp`.
+**`inline constexpr`** — `constexpr` = nilai diketahui saat kompilasi. `inline` = boleh didefinisikan di header tanpa melanggar ODR (One Definition Rule).
 
 ---
 
 ### 5.2 Helper Fungsi Serialisasi
 
 ```cpp
-// Menulis integer dalam format LITTLE-ENDIAN (byte paling rendah ditulis pertama)
+// Menulis integer dalam format LITTLE-ENDIAN
 static void write_u16(std::ostream& out, uint16_t v) {
     out.put(static_cast<char>(v & 0xFF));         // Byte rendah
     out.put(static_cast<char>((v >> 8) & 0xFF));  // Byte tinggi
 }
+```
 
+**Contoh:** Menulis `uint16_t` nilai `15` (panjang `"abracadabra.txt"`):
+
+```text
+v = 15 = 0x000F
+Byte 1: 0x000F & 0xFF = 0x0F → tulis 0x0F
+Byte 2: (0x000F >> 8) & 0xFF = 0x00 → tulis 0x00
+File: [0F 00]  ← little-endian (byte rendah dulu)
+```
+
+```cpp
 static void write_u64(std::ostream& out, uint64_t v) {
     for (int i = 0; i < 8; ++i)
         out.put(static_cast<char>((v >> (8 * i)) & 0xFF));
 }
 ```
 
-**Little-Endian:** Byte paling tidak signifikan (least significant byte) ditulis terlebih dahulu. Contoh: angka `0x1234` ditulis sebagai byte `0x34` diikuti `0x12`. Format ini dipilih karena umum digunakan di arsitektur x86.
+**Contoh:** Menulis `uint64_t` nilai `11` (ukuran `"abracadabra"`):
 
-**`v & 0xFF`** — Operasi bitwise AND yang mengambil 8 bit paling rendah dari `v`.
+```text
+v = 11 = 0x000000000000000B
+i=0: (v >> 0)  & 0xFF = 0x0B  → tulis
+i=1: (v >> 8)  & 0xFF = 0x00  → tulis
+...
+i=7: (v >> 56) & 0xFF = 0x00  → tulis
+File: [0B 00 00 00 00 00 00 00]
+```
 
-**`(v >> 8) & 0xFF`** — Geser `v` ke kanan 8 bit, lalu ambil 8 bit terendah. Hasilnya adalah byte kedua dari `v`.
-
-**`static`** — Membatasi visibilitas fungsi hanya di dalam file ini (*internal linkage*). Fungsi ini tidak bisa dipanggil dari file `.cpp` lain.
+**`static`** — Membatasi visibilitas fungsi hanya di dalam file ini (*internal linkage*).
 
 ```cpp
 // Membaca integer dari format little-endian
-static uint8_t read_u8(std::istream& in) {
-    char ch;
-    if (!in.get(ch)) throw std::runtime_error("Unexpected EOF");
-    return static_cast<uint8_t>(ch);
-}
-
 static uint64_t read_u64(std::istream& in) {
     uint64_t v = 0;
     for (int i = 0; i < 8; ++i)
@@ -787,15 +1057,38 @@ static uint64_t read_u64(std::istream& in) {
 }
 ```
 
-**`v |= ... << (8 * i)`** — Membaca byte ke-`i`, menggesernya ke posisi yang tepat, lalu meng-OR-kan dengan akumulator `v`. Setelah 8 iterasi, `v` berisi integer 64-bit lengkap.
+**Contoh:** Membaca `[0B 00 00 00 00 00 00 00]`:
+
+```text
+i=0: baca 0x0B, geser << 0  = 0x000000000000000B, v |= → v = 0x0B
+i=1: baca 0x00, geser << 8  = 0x0000000000000000, v |= → v = 0x0B
+...
+Hasil: v = 11 ✅
+```
 
 ---
 
 ### 5.3 ArchiveWriter::compress()
 
+Berikut flow kompresi dengan anotasi untuk setiap tahap:
+
+```mermaid
+flowchart LR
+    A["Baca file<br/><i>abracadabra</i>"] --> B["Hitung frekuensi<br/><i>a=5,b=2,r=2,c=1,d=1</i>"]
+    B --> C["Bangun tree<br/>+ generate codes"]
+    C --> D["Encode ke bitstream<br/><i>23 bits → 3 bytes</i>"]
+    D --> E["Tulis .puff<br/><b>header + data</b>"]
+
+    style A fill:#3498db,color:#fff
+    style B fill:#9b59b6,color:#fff
+    style C fill:#e67e22,color:#fff
+    style D fill:#27ae60,color:#fff
+    style E fill:#2c3e50,color:#fff
+```
+
 ```cpp
 void ArchiveWriter::compress(const fs::path& file_path) {
-    // 1. VALIDASI: Pastikan file ada dan merupakan file reguler
+    // 1. VALIDASI
     if (!fs::exists(file_path) || !fs::is_regular_file(file_path)) {
         throw std::runtime_error("Not a regular file: " + file_path.string());
     }
@@ -803,72 +1096,69 @@ void ArchiveWriter::compress(const fs::path& file_path) {
     // 2. BACA seluruh file ke memory
     std::ifstream in(file_path, std::ios::binary);
     std::ostringstream raw_buf;
-    raw_buf << in.rdbuf();                    // Salin seluruh isi stream
+    raw_buf << in.rdbuf();   // Salin seluruh isi stream ke ostringstream
     std::string raw_data = raw_buf.str();
+    // raw_data = "abracadabra" (11 byte)
 
-    // 3. HITUNG frekuensi setiap byte
+    // 3. HITUNG frekuensi
     std::istringstream freq_stream(raw_data);
     ByteFrequencyMap frequencies = Encoder::calculate_frequencies(freq_stream);
+    // frequencies = {a:5, b:2, r:2, c:1, d:1}
 
-    // 4. BANGUN pohon Huffman dari tabel frekuensi
+    // 4. BANGUN pohon Huffman + generate kode
     HuffmanTree tree;
     tree.build(frequencies);
     HuffmanCodeMap codes = tree.generate_codes();
+    // codes = {a:0, r:10, b:111, c:1100, d:1101}
 
-    // 5. ENCODE: ganti setiap byte dengan kode Huffman-nya
+    // 5. ENCODE
     std::istringstream encode_stream(raw_data);
     std::ostringstream compressed_buf;
     EncodeResult result = Encoder::encode(encode_stream, compressed_buf, codes);
     std::string compressed_data = compressed_buf.str();
+    // compressed_data = [0x79, 0x8D, 0x78] (3 byte)
+    // result.padding_bits = 1
 
     // 6. TULIS file .puff
     fs::path output_path = file_path;
     output_path.replace_extension(".puff");
+    // "abracadabra.txt" → "abracadabra.puff"
 
     std::ofstream out(output_path, std::ios::binary);
 
-    // Header
-    write_bytes(out, PUFF_MAGIC, 4);          // "PUFF"
-    write_u8(out, PUFF_VERSION_MAJOR);        // 0x01
-    write_u8(out, PUFF_VERSION_MINOR);        // 0x00
+    write_bytes(out, PUFF_MAGIC, 4);       // "PUFF"
+    write_u8(out, PUFF_VERSION_MAJOR);     // 0x01
+    write_u8(out, PUFF_VERSION_MINOR);     // 0x00
 
     std::string filename = file_path.filename().string();
-    write_u16(out, static_cast<uint16_t>(filename.size()));
-    write_bytes(out, filename.data(), filename.size());
+    write_u16(out, static_cast<uint16_t>(filename.size()));  // 15
+    write_bytes(out, filename.data(), filename.size());       // "abracadabra.txt"
 
-    write_u64(out, raw_data.size());          // Ukuran asli
+    write_u64(out, raw_data.size());       // 11
 
-    // Tabel frekuensi
-    write_u16(out, static_cast<uint16_t>(frequencies.size()));
+    write_u16(out, static_cast<uint16_t>(frequencies.size()));  // 5
     for (const auto& [sym, freq] : frequencies) {
-        write_u8(out, sym);
-        write_u64(out, freq);
+        write_u8(out, sym);                // 'a'
+        write_u64(out, freq);              // 5
     }
 
-    write_u8(out, result.padding_bits);       // Jumlah padding
-
-    // Data terkompresi
-    write_bytes(out, compressed_data.data(), compressed_data.size());
+    write_u8(out, result.padding_bits);    // 1
+    write_bytes(out, compressed_data.data(), compressed_data.size());  // 3 byte
     out.flush();
 
-    // 7. TAMPILKAN hasil ke user
+    // 7. TAMPILKAN hasil
     double ratio = (1.0 - static_cast<double>(compressed_data.size()) /
                           static_cast<double>(raw_data.size())) * 100.0;
+    // ratio = (1.0 - 3/11) × 100 = 72.7%
 
-    std::cout << "Compressed: " << file_path.filename().string()
-              << " -> " << output_path.filename().string() << "\n"
-              << "  Original:   " << raw_data.size() << " bytes\n"
-              << "  Compressed: " << compressed_data.size() << " bytes\n"
-              << "  Ratio:      " << std::fixed << std::setprecision(1)
-              << ratio << "% reduction\n";
+    std::cout << "Compressed: abracadabra.txt -> abracadabra.puff\n"
+              << "  Original:   11 bytes\n"
+              << "  Compressed: 3 bytes\n"
+              << "  Ratio:      72.7% reduction\n";
 }
 ```
 
-**`std::ios::binary`** — Membuka file dalam mode biner. Tanpa flag ini, pada Windows, karakter `\n` (0x0A) akan dikonversi menjadi `\r\n` (0x0D 0x0A), yang akan merusak data biner.
-
-**`raw_buf << in.rdbuf()`** — Menyalin seluruh isi `ifstream` ke `ostringstream`. `rdbuf()` mengembalikan buffer internal dari stream.
-
-**`file_path.replace_extension(".puff")`** — Method dari `std::filesystem::path` yang mengganti ekstensi file. `sample.txt` → `sample.puff`.
+**`std::ios::binary`** — Mode biner. Tanpa ini, pada Windows `\n` (0x0A) dikonversi ke `\r\n` (0x0D 0x0A), merusak data.
 
 ---
 
@@ -883,43 +1173,43 @@ void ArchiveReader::extract(const fs::path& archive_path) {
     if (!in.read(magic, 4) || std::memcmp(magic, PUFF_MAGIC, 4) != 0) {
         throw std::runtime_error("Invalid archive format");
     }
+    // Baca [50 55 46 46], bandingkan dengan "PUFF" → cocok ✅
 
     // 2. BACA versi
-    uint8_t major = read_u8(in);
-    uint8_t minor = read_u8(in);
+    uint8_t major = read_u8(in);   // 0x01
+    uint8_t minor = read_u8(in);   // 0x00
     (void)minor;  // Suppress "unused variable" warning
 
-    if (major != PUFF_VERSION_MAJOR) {
-        throw std::runtime_error("Unsupported archive version");
-    }
-
     // 3. BACA nama file asli
-    uint16_t name_len = read_u16(in);
+    uint16_t name_len = read_u16(in);  // 15
     std::string original_filename(name_len, '\0');
     in.read(original_filename.data(), name_len);
+    // original_filename = "abracadabra.txt"
 
     // 4. BACA ukuran asli
-    uint64_t original_size = read_u64(in);
+    uint64_t original_size = read_u64(in);  // 11
 
-    // 5. BACA tabel frekuensi & REBUILD pohon Huffman
-    uint16_t unique_symbols = read_u16(in);
+    // 5. BACA tabel frekuensi & REBUILD pohon
+    uint16_t unique_symbols = read_u16(in);  // 5
     ByteFrequencyMap frequencies;
     for (uint16_t i = 0; i < unique_symbols; ++i) {
-        uint8_t  sym  = read_u8(in);
-        uint64_t freq = read_u64(in);
+        uint8_t  sym  = read_u8(in);   // 'a', 'b', 'r', 'c', 'd'
+        uint64_t freq = read_u64(in);  // 5, 2, 2, 1, 1
         frequencies[sym] = freq;
     }
 
-    read_u8(in);  // padding_bits (tidak digunakan langsung — decoder berhenti
-                  // berdasarkan original_size)
+    read_u8(in);  // padding_bits = 1 (tidak digunakan langsung)
 
     HuffmanTree tree;
-    tree.build(frequencies);  // Rebuild pohon yang IDENTIK dengan saat compress
+    tree.build(frequencies);
+    // Pohon IDENTIK dengan saat compress (karena data frekuensi sama
+    // dan build() deterministik)
 
     // 6. BACA sisa data (bitstream terkompresi)
     std::ostringstream rest;
     rest << in.rdbuf();
     std::string compressed_data = rest.str();
+    // compressed_data = [0x79, 0x8D, 0x78]
 
     // 7. DECODE
     fs::path output_path = archive_path.parent_path() / original_filename;
@@ -927,22 +1217,16 @@ void ArchiveReader::extract(const fs::path& archive_path) {
     std::ofstream out(output_path, std::ios::binary);
 
     Decoder::decode(compressed_stream, out, tree, original_size);
+    // Decode 23 bit → 11 byte → "abracadabra" ✅
 
-    std::cout << "Extracted: " << archive_path.filename().string()
-              << " -> " << original_filename << "\n"
-              << "  Size: " << original_size << " bytes\n";
+    std::cout << "Extracted: abracadabra.puff -> abracadabra.txt\n"
+              << "  Size: 11 bytes\n";
 }
 ```
 
-**`std::memcmp(magic, PUFF_MAGIC, 4)`** — Membandingkan 4 byte pertama file dengan "PUFF". Jika hasilnya `!= 0`, file bukan arsip `.puff` yang valid.
-
-**`(void)minor`** — Idiom C++ untuk mensupresi compiler warning tentang variabel yang tidak digunakan. Kita membaca `minor` dari stream (karena harus mengonsumsi byte tersebut), tapi saat ini tidak menggunakannya untuk logika apapun.
-
-**`archive_path.parent_path() / original_filename`** — Operator `/` pada `std::filesystem::path` menggabungkan path. Jika arsip berada di `samples/data.puff` dan nama aslinya `data.txt`, hasilnya `samples/data.txt`.
-
-**Kunci Lossless:** Fungsi `tree.build(frequencies)` di sini akan menghasilkan pohon yang **100% identik** dengan pohon yang dibangun saat compress, karena:
-1. Tabel frekuensi disimpan secara eksak di header arsip
-2. Fungsi `build()` mengurutkan frekuensi secara deterministik sebelum memasukkannya ke priority queue
+**Kunci Lossless:** `tree.build(frequencies)` menghasilkan pohon **100% identik** karena:
+1. Tabel frekuensi disimpan **secara eksak** di header arsip
+2. `build()` mengurutkan frekuensi secara **deterministik** sebelum push ke priority queue
 
 ---
 
@@ -959,25 +1243,37 @@ Modul ini menghitung **metrik matematis** dari Information Theory.
 ```cpp
 struct AnalysisResult {
     std::string filename;
-    uint64_t total_symbols  = 0;   // Jumlah total byte dalam file
-    uint16_t unique_symbols = 0;   // Jumlah simbol unik (karakter berbeda)
+    uint64_t total_symbols  = 0;   // Jumlah total byte
+    uint16_t unique_symbols = 0;   // Jumlah simbol unik
     int tree_height         = 0;   // Tinggi pohon Huffman
-    int total_nodes         = 0;   // Jumlah node dalam pohon
+    int total_nodes         = 0;   // Jumlah node
     double entropy          = 0.0; // Shannon Entropy (bits/symbol)
-    double avg_code_length  = 0.0; // Rata-rata panjang kode Huffman
+    double avg_code_length  = 0.0; // Rata-rata panjang kode
     double efficiency       = 0.0; // (entropy / avg_code_length) × 100%
 
     struct SymbolInfo {
-        uint8_t     symbol;        // Byte simbol
-        uint64_t    frequency;     // Berapa kali muncul
-        double      percentage;    // Persentase kemunculan
-        std::string code;          // Kode Huffman dalam bentuk string "010110"
+        uint8_t     symbol;
+        uint64_t    frequency;
+        double      percentage;
+        std::string code;          // "010110" dalam bentuk string
     };
-    std::vector<SymbolInfo> top_symbols;  // 10 simbol paling sering
+    std::vector<SymbolInfo> top_symbols;
 };
 ```
 
-Struct ini adalah **data container** murni — tidak memiliki logika, hanya menyimpan hasil kalkulasi agar bisa dioper ke fungsi `print_report()`.
+**Contoh `"abracadabra"` — Nilai AnalysisResult:**
+
+```text
+filename        = "abracadabra.txt"
+total_symbols   = 11
+unique_symbols  = 5
+tree_height     = 5
+total_nodes     = 9
+entropy         = 2.04 bits/symbol
+avg_code_length = 2.09 bits/symbol
+efficiency      = 97.6%
+top_symbols     = [{a,5,45.5%,"0"}, {b,2,18.2%,"111"}, {r,2,18.2%,"10"}, ...]
+```
 
 ---
 
@@ -989,7 +1285,6 @@ AnalysisResult Statistics::analyze(const fs::path& file_path) {
 
     // === SHANNON ENTROPY ===
     // H = -Σ p(x) × log₂(p(x))
-    // dimana p(x) = frekuensi(x) / total_symbols
     double entropy = 0.0;
     for (const auto& [sym, freq] : frequencies) {
         double p = static_cast<double>(freq) / static_cast<double>(result.total_symbols);
@@ -998,22 +1293,27 @@ AnalysisResult Statistics::analyze(const fs::path& file_path) {
     result.entropy = entropy;
 ```
 
-**Shannon Entropy** adalah konsep fundamental dari Information Theory (Claude Shannon, 1948). Entropy mengukur **rata-rata jumlah informasi minimum** (dalam bit) yang diperlukan untuk merepresentasikan setiap simbol.
+**Shannon Entropy** (Claude Shannon, 1948) mengukur **rata-rata jumlah informasi minimum** per simbol.
 
 **Formula:** $H = -\sum_{x \in X} p(x) \cdot \log_2 p(x)$
 
-- $p(x)$ = probabilitas kemunculan simbol $x$ = `freq / total`
-- $\log_2 p(x)$ = jumlah bit yang dibutuhkan jika hanya ada simbol $x$
-- Tanda negatif karena $\log_2$ dari angka antara 0 dan 1 selalu negatif
+**Perhitungan `"abracadabra"` langkah per langkah:**
 
-**Contoh:** Jika `'e'` muncul 10% dari waktu, maka $p(e) = 0.1$ dan kontribusinya ke entropy = $-0.1 \times \log_2(0.1) = -0.1 \times (-3.32) = 0.332$ bits.
+```text
+p(a) = 5/11 = 0.4545    -p·log₂(p) = -0.4545 × log₂(0.4545) = -0.4545 × (-1.138) = 0.517
+p(b) = 2/11 = 0.1818    -p·log₂(p) = -0.1818 × log₂(0.1818) = -0.1818 × (-2.459) = 0.447
+p(r) = 2/11 = 0.1818    -p·log₂(p) = -0.1818 × log₂(0.1818) = -0.1818 × (-2.459) = 0.447
+p(c) = 1/11 = 0.0909    -p·log₂(p) = -0.0909 × log₂(0.0909) = -0.0909 × (-3.459) = 0.314
+p(d) = 1/11 = 0.0909    -p·log₂(p) = -0.0909 × log₂(0.0909) = -0.0909 × (-3.459) = 0.314
+                                                                              ─────────
+                                                                    H = Σ  = 2.04 bits/symbol
+```
 
-**`if (p > 0)`** — Karena $\log_2(0)$ adalah *undefined* (negatif tak hingga), kita melewati simbol dengan frekuensi 0.
+**Interpretasi:** Secara teori, setiap karakter dalam `"abracadabra"` membutuhkan **minimal 2.04 bit** untuk di-encode tanpa kehilangan informasi.
 
 ```cpp
     // === AVERAGE CODE LENGTH ===
     // L = Σ p(x) × |code(x)|
-    // dimana |code(x)| adalah panjang kode Huffman untuk simbol x
     double avg_len = 0.0;
     for (const auto& [sym, freq] : frequencies) {
         double p = static_cast<double>(freq) / static_cast<double>(result.total_symbols);
@@ -1022,35 +1322,32 @@ AnalysisResult Statistics::analyze(const fs::path& file_path) {
     result.avg_code_length = avg_len;
 ```
 
-**Average Code Length** ($L$) adalah **rata-rata tertimbang** dari panjang semua kode Huffman. Menurut **Source Coding Theorem** Shannon, untuk kode prefix-free optimal:
+**Perhitungan `"abracadabra"`:**
 
-$$H \leq L < H + 1$$
+```text
+L = p(a)×|code(a)| + p(b)×|code(b)| + p(r)×|code(r)| + p(c)×|code(c)| + p(d)×|code(d)|
+  = 5/11 × 1       + 2/11 × 3       + 2/11 × 2       + 1/11 × 4       + 1/11 × 4
+  = 5/11            + 6/11           + 4/11           + 4/11           + 4/11
+  = 23/11
+  = 2.09 bits/symbol
+```
 
-Artinya, kode Huffman mendekati batas teoritisnya — tidak bisa lebih baik dari entropy.
+**Menurut Source Coding Theorem Shannon:** $H \leq L < H + 1$ → $2.04 \leq 2.09 < 3.04$ ✅
 
 ```cpp
     // === COMPRESSION EFFICIENCY ===
-    // efficiency = (H / L) × 100%
     result.efficiency = (result.avg_code_length > 0)
         ? (result.entropy / result.avg_code_length) * 100.0
         : 0.0;
 ```
 
-**Compression Efficiency** mengukur seberapa dekat kode Huffman kita dengan batas optimal Shannon Entropy. Efisiensi 100% berarti $L = H$ (sempurna). Dalam praktik, efisiensi Huffman biasanya 95–99.9%.
+**Perhitungan `"abracadabra"`:**
 
-```cpp
-    // Urutkan simbol berdasarkan frekuensi (tertinggi dulu)
-    std::vector<std::pair<uint8_t, uint64_t>> freq_vec(
-        frequencies.begin(), frequencies.end()
-    );
-    std::sort(freq_vec.begin(), freq_vec.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
-
-    // Ambil 10 simbol teratas
-    size_t top_n = std::min<size_t>(10, freq_vec.size());
+```text
+η = H/L × 100 = 2.04/2.09 × 100 = 97.6%
 ```
 
-**`std::min<size_t>(10, freq_vec.size())`** — Template explicit instantiation. Tanpa `<size_t>`, compiler bisa bingung karena `10` bertipe `int` dan `freq_vec.size()` bertipe `size_t` (unsigned).
+Artinya kode Huffman kita hanya 2.4% kurang efisien dari batas teori Shannon. Sangat optimal!
 
 ---
 
@@ -1058,56 +1355,47 @@ Artinya, kode Huffman mendekati batas teoritisnya — tidak bisa lebih baik dari
 
 ```cpp
 void Statistics::print_report(const AnalysisResult& result) {
-    // Lambda untuk memformat simbol agar mudah dibaca
     auto format_symbol = [](uint8_t sym) -> std::string {
-        if (sym == ' ') return "' '";       // Spasi
-        if (sym == '\n') return "'\\n'";     // Newline
-        if (sym >= 33 && sym < 127)          // Printable ASCII
-            return std::string("'") + static_cast<char>(sym) + "'";
+        if (sym == ' ') return "' '";
+        if (sym == '\n') return "'\\n'";
+        if (sym >= 33 && sym < 127) return std::string("'") + static_cast<char>(sym) + "'";
         char buf[8];
-        std::snprintf(buf, sizeof(buf), "0x%02X", sym);  // Non-printable → hex
+        std::snprintf(buf, sizeof(buf), "0x%02X", sym);
         return buf;
     };
 ```
 
-**`-> std::string`** — *Trailing return type* pada lambda. Memberi tahu compiler secara eksplisit tipe kembalian lambda.
+**Contoh output `"abracadabra"`:**
 
-**`std::snprintf(buf, sizeof(buf), "0x%02X", sym)`** — Fungsi format ala C yang menulis ke buffer. `%02X` berarti: hexadecimal, minimal 2 digit, padded dengan nol. Contoh: byte `0x0A` ditulis sebagai `"0x0A"`.
-
-```cpp
-    // Lambda untuk memformat angka dengan pemisah ribuan
-    auto format_num = [](uint64_t n) {
-        std::string s = std::to_string(n);
-        int p = static_cast<int>(s.length()) - 3;
-        while (p > 0) { s.insert(p, ","); p -= 3; }
-        return s;
-    };
+```text
+═══════════════════════════════════════════════════
+  Pufferfish — Huffman Analysis
+═══════════════════════════════════════════════════
+  File:                    abracadabra.txt
+  Total Symbols:           11
+  Unique Symbols:          5
+───────────────────────────────────────────────────
+  Tree Height:             5
+  Total Nodes:             9
+───────────────────────────────────────────────────
+  Shannon Entropy:         2.04 bits/symbol
+  Average Code Length:     2.09 bits/symbol
+  Compression Efficiency:  97.6%
+───────────────────────────────────────────────────
+  Top Symbols:
+    'a'    →  45.5%   Code: 0
+    'b'    →  18.2%   Code: 111
+    'r'    →  18.2%   Code: 10
+    'c'    →   9.1%   Code: 1100
+    'd'    →   9.1%   Code: 1101
+═══════════════════════════════════════════════════
 ```
 
-**Contoh:** `1496` → `"1,496"`, `1000000` → `"1,000,000"`.
+**`std::fixed`** — Notasi desimal tetap (bukan scientific). `4.65` bukan `4.65e+00`.
 
-```cpp
-    // Output tabel dengan border Unicode
-    std::cout << "\n"
-        << "═══════════════════════════════════════════════════\n"
-        << "  Pufferfish — Huffman Analysis\n"
-        << "═══════════════════════════════════════════════════\n"
-        << "  File:                    " << result.filename << "\n"
-        // ... (field lainnya)
-        << std::fixed << std::setprecision(2)
-        << "  Shannon Entropy:         " << result.entropy << " bits/symbol\n"
-        << "  Average Code Length:     " << result.avg_code_length << " bits/symbol\n"
-        << "  Compression Efficiency:  " << std::setprecision(1)
-        << result.efficiency << "%\n";
-```
+**`std::setprecision(2)`** — 2 digit di belakang koma. Efek persisten.
 
-**`std::fixed`** — Menampilkan angka desimal dalam notasi tetap (bukan scientific). Contoh: `4.65` bukan `4.65e+00`.
-
-**`std::setprecision(2)`** — Menampilkan 2 digit di belakang koma. Efeknya persisten (berlaku sampai diubah lagi).
-
-**`std::setw(6)`** — Mengatur lebar minimum kolom menjadi 6 karakter. Efeknya hanya untuk satu output berikutnya.
-
-**`std::left` / `std::right`** — Mengatur alignment teks dalam kolom. `left` untuk rata kiri, `right` untuk rata kanan.
+**`std::setw(6)`** — Lebar minimum kolom 6 karakter. Efek hanya untuk 1 output berikutnya.
 
 ---
 
@@ -1115,40 +1403,40 @@ void Statistics::print_report(const AnalysisResult& result) {
 
 File: `src/main.cpp`
 
-```cpp
-#include "archive.hpp"
-#include "statistics.hpp"
+```mermaid
+flowchart TD
+    START["./puff <cmd> <file>"] --> CHECK{"argc >= 2?"}
+    CHECK -->|Tidak| HELP["print_usage()<br/>return 1"]
+    CHECK -->|Ya| ALIAS["Resolve alias<br/>c→compress, x→extract, a→analyze"]
+    ALIAS --> ROUTE{"Command?"}
+    ROUTE -->|compress| COMP["ArchiveWriter::compress(argv[2])"]
+    ROUTE -->|extract| EXTR["ArchiveReader::extract(argv[2])"]
+    ROUTE -->|analyze| ANAL["Statistics::analyze(argv[2])<br/>Statistics::print_report(result)"]
+    ROUTE -->|help| HELP2["print_usage()<br/>return 0"]
+    ROUTE -->|unknown| ERR["throw runtime_error"]
+    COMP --> OK["return 0"]
+    EXTR --> OK
+    ANAL --> OK
+    ERR --> CATCH["catch: cerr << error<br/>return 1"]
 
-namespace pufferfish {
-    void print_usage(const std::string& program) {
-        std::cout << R"(Pufferfish — Educational Huffman Coding Utility
-        // ... help text
-        )";
-    }
-} // namespace pufferfish
+    style START fill:#2c3e50,color:#fff
+    style OK fill:#27ae60,color:#fff
+    style HELP fill:#e74c3c,color:#fff
+    style CATCH fill:#e74c3c,color:#fff
 ```
-
-**`R"(...)"` — Raw string literal** (C++11). Memungkinkan menulis string multi-baris tanpa escape character. Semua yang ada di antara `R"(` dan `)"` dianggap karakter literal, termasuk newline dan tanda kutip.
 
 ```cpp
 int main(int argc, char* argv[]) {
-    // argc = jumlah argumen (termasuk nama program)
-    // argv = array of C-strings berisi argumen
-    // Contoh: "./puff compress file.txt"
-    //   argc = 3
-    //   argv[0] = "./puff"
-    //   argv[1] = "compress"
-    //   argv[2] = "file.txt"
+    // argc = jumlah argumen, argv = array of C-strings
+    // "./puff compress abracadabra.txt" → argc=3, argv=["./puff","compress","abracadabra.txt"]
 
     if (argc < 2) {
         pufferfish::print_usage(argv[0]);
-        return 1;  // Exit code non-zero = error
+        return 1;  // non-zero = error
     }
 
     std::string cmd = argv[1];
-
-    // Shorthand aliases
-    if (cmd == "c") cmd = "compress";
+    if (cmd == "c") cmd = "compress";  // Shorthand alias
     if (cmd == "x") cmd = "extract";
     if (cmd == "a") cmd = "analyze";
 
@@ -1158,10 +1446,8 @@ int main(int argc, char* argv[]) {
             pufferfish::ArchiveWriter::compress(argv[2]);
             return 0;
         }
-        // ... (extract, analyze, help — pola yang sama)
-
+        // ... (extract, analyze, help — pola sama)
         throw std::runtime_error("Unknown command: " + cmd);
-
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
         return 1;
@@ -1169,11 +1455,9 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-**`try { ... } catch (const std::exception& e)`** — Blok *exception handling*. Semua error dari modul-modul di bawah (runtime_error) akan ditangkap di sini dan ditampilkan ke user secara rapi via `stderr`.
+**`try/catch`** — Semua error dari modul-modul di bawah ditangkap di sini dan ditampilkan ke user via `stderr`.
 
-**`std::cerr`** — Output stream untuk error messages. Tidak di-buffer (langsung flush), dan bisa dipisahkan dari `stdout` di shell (`2>/dev/null`).
-
-**`return 0` vs `return 1`** — Konvensi Unix: `0` = sukses, non-zero = error. Shell dan script bisa mengecek exit code ini.
+**`R"(...)"` (di `print_usage`)** — Raw string literal C++11. Multi-baris tanpa escape character.
 
 ---
 
@@ -1181,43 +1465,59 @@ int main(int argc, char* argv[]) {
 
 ### Ringkasan Pemetaan Teori → Kode
 
-| Konsep Matematika | Lokasi dalam Kode | Fungsi/Kelas |
-| :--- | :--- | :--- |
-| **Binary Tree** | `huffman.hpp` | `HuffmanNode` (struct dengan left/right pointer) |
-| **Min-Heap (Priority Queue)** | `huffman.cpp` | `std::priority_queue` dengan custom comparator di `build()` |
-| **Greedy Algorithm** | `huffman.cpp` | Loop `while (pq.size() > 1)` yang selalu mengambil 2 node terkecil |
-| **Prefix-Free Code** | `huffman.cpp` | `generate_codes_impl()` — kode hanya di-assign ke leaf node |
-| **Shannon Entropy** | `statistics.cpp` | `analyze()` — formula $H = -\sum p \log_2 p$ |
-| **Lossless Compression** | `archive.cpp` | Round-trip: `compress()` lalu `extract()` menghasilkan file identik |
-| **Information Encoding** | `huffman.cpp` | `Encoder::encode()` — mengganti byte tetap 8-bit dengan kode variabel |
-| **DFS (Depth-First Search)** | `huffman.cpp` | `generate_codes_impl()` — traversal rekursif |
-| **Bitwise Operations** | `huffman.cpp` | `BitWriter` dan `BitReader` — shift, AND, OR |
-| **Serialisasi Biner** | `archive.cpp` | `write_u16()`, `write_u64()`, `read_u16()`, `read_u64()` |
+| Konsep Matematika | Lokasi | Fungsi/Kelas | Contoh "abracadabra" |
+| :--- | :--- | :--- | :--- |
+| **Binary Tree** | `huffman.hpp` | `HuffmanNode` | 9 node, tinggi 5 |
+| **Min-Heap** | `huffman.cpp` | `std::priority_queue` di `build()` | c(1),d(1) diambil pertama |
+| **Greedy Algorithm** | `huffman.cpp` | Loop `while (pq.size() > 1)` | 4 iterasi merge |
+| **Prefix-Free Code** | `huffman.cpp` | `generate_codes_impl()` | a=0, b=111 (tak ambigu) |
+| **Shannon Entropy** | `statistics.cpp` | `analyze()` | H = 2.04 bits/symbol |
+| **Lossless Compression** | `archive.cpp` | Round-trip compress→extract | 11 byte → 3 byte → 11 byte |
+| **Information Encoding** | `huffman.cpp` | `Encoder::encode()` | 88 bit → 23 bit |
+| **DFS Traversal** | `huffman.cpp` | `generate_codes_impl()` | Kiri=0, Kanan=1 |
+| **Bitwise Operations** | `huffman.cpp` | `BitWriter`, `BitReader` | `(buffer << 1) \| bit` |
+| **Serialisasi Biner** | `archive.cpp` | `write_u16()`, `read_u64()` | Little-endian |
+
+### Visualisasi Ringkasan
+
+```mermaid
+graph LR
+    INPUT["abracadabra<br/>11 byte = 88 bit"] --> FREQ["Frequency<br/>Analysis"]
+    FREQ --> TREE["Huffman Tree<br/>Greedy + Min-Heap"]
+    TREE --> CODES["Prefix-Free<br/>Codes"]
+    CODES --> ENCODE["Encoding<br/>88 bit → 23 bit"]
+    ENCODE --> OUTPUT["abracadabra.puff<br/>3 byte data"]
+
+    ENTROPY["Shannon Entropy<br/>H = 2.04 bits/sym"] -.->|"batas bawah teori"| AVG["Avg Code Length<br/>L = 2.09 bits/sym"]
+    AVG -.->|"η = 97.6%"| ENCODE
+
+    style INPUT fill:#3498db,color:#fff
+    style OUTPUT fill:#27ae60,color:#fff
+    style ENTROPY fill:#e74c3c,color:#fff
+```
 
 ---
 
 ## 9. Glossary Sintaks C++ yang Digunakan
 
-Referensi cepat untuk sintaks C++ modern yang digunakan di proyek ini.
-
 | Sintaks | Standar | Penjelasan | Contoh di Proyek |
 | :--- | :--- | :--- | :--- |
 | `auto` | C++11 | Deduksi tipe otomatis | `auto cmp = [](...){}` |
 | `[](auto& a){ ... }` | C++11/14 | Lambda expression | Comparator di `build()` |
-| `std::unique_ptr<T>` | C++11 | Smart pointer dengan kepemilikan tunggal | `HuffmanNode::left`, `right` |
-| `std::make_unique<T>(...)` | C++14 | Membuat unique_ptr secara aman | `pq.push(make_unique<HuffmanNode>(...))` |
-| `std::move(x)` | C++11 | Mentransfer kepemilikan resource | Move node antar tree |
+| `std::unique_ptr<T>` | C++11 | Smart pointer kepemilikan tunggal | `HuffmanNode::left`, `right` |
+| `std::make_unique<T>(...)` | C++14 | Membuat unique_ptr secara aman | `pq.push(make_unique<...>(...))` |
+| `std::move(x)` | C++11 | Transfer kepemilikan resource | Move node antar tree |
 | `const auto& [k, v]` | C++17 | Structured binding | `for (const auto& [sym, freq] : ...)` |
-| `std::optional<T>` | C++17 | Tipe yang bisa kosong | `BitReader::read_bit()` return type |
+| `std::optional<T>` | C++17 | Tipe yang bisa kosong | `BitReader::read_bit()` |
 | `std::nullopt` | C++17 | Nilai "kosong" untuk optional | Return saat EOF |
-| `[[nodiscard]]` | C++17 | Atribut: return value harus digunakan | `is_leaf()`, `generate_codes()` |
-| `constexpr` | C++11 | Evaluasi saat kompilasi | `PUFF_MAGIC`, `PUFF_VERSION_*` |
-| `noexcept` | C++11 | Janji tidak melempar exception | `is_leaf()`, `height()` |
-| `static_cast<T>(x)` | C++11 | Konversi tipe eksplisit yang aman | Konversi `char` ↔ `uint8_t` |
+| `[[nodiscard]]` | C++17 | Return value harus digunakan | `is_leaf()`, `generate_codes()` |
+| `constexpr` | C++11 | Evaluasi saat kompilasi | `PUFF_MAGIC` |
+| `noexcept` | C++11 | Tidak melempar exception | `is_leaf()`, `height()` |
+| `static_cast<T>(x)` | C++11 | Konversi tipe eksplisit | `char` ↔ `uint8_t` |
 | `const_cast<T>(x)` | C++11 | Menghapus qualifier `const` | Move dari `pq.top()` |
-| `decltype(expr)` | C++11 | Mendapatkan tipe dari ekspresi | `decltype(cmp)` untuk tipe lambda |
+| `decltype(expr)` | C++11 | Mendapatkan tipe dari ekspresi | `decltype(cmp)` |
 | `R"(...)"` | C++11 | Raw string literal (tanpa escape) | Help text di `main.cpp` |
-| `#ifndef` / `#define` / `#endif` | C89 | Include guard (mencegah double inclusion) | Setiap `.hpp` |
-| `namespace` | C++98 | Pengelompokan nama untuk menghindari konflik | `namespace pufferfish { }` |
-| `std::filesystem::path` | C++17 | Representasi path file yang cross-platform | Parameter di `compress()`, `extract()` |
-| `try { } catch (const std::exception& e)` | C++98 | Exception handling | `main()` |
+| `namespace` | C++98 | Pengelompokan nama | `namespace pufferfish { }` |
+| `std::filesystem::path` | C++17 | Representasi path cross-platform | Parameter `compress()`, `extract()` |
+| `try/catch` | C++98 | Exception handling | `main()` |
+| `#ifndef`/`#define`/`#endif` | C89 | Include guard | Setiap `.hpp` |
