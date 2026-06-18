@@ -10,6 +10,7 @@
 #include <optional>
 #include <queue>
 #include <stdexcept>
+#include <algorithm>
 
 namespace pufferfish {
 

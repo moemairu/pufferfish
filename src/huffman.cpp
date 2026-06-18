@@ -30,7 +30,17 @@ namespace pufferfish {
 
         std::priority_queue<std::unique_ptr<HuffmanNode>, std::vector<std::unique_ptr<HuffmanNode>>, decltype(cmp)> pq(cmp);
 
-        for (const auto& [sym, freq] : frequencies) {
+        // Sort by symbol ascending to ensure deterministic push order.
+        // unordered_map iteration order depends on insert order, which
+        // differs between compress (from file scan) and extract (from
+        // archive header). Without sorting, tie-breaking among internal
+        // nodes with equal frequencies becomes non-deterministic, producing
+        // different trees for the same frequency data.
+        std::vector<std::pair<uint8_t, uint64_t>> sorted_freq(frequencies.begin(), frequencies.end());
+        std::sort(sorted_freq.begin(), sorted_freq.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        for (const auto& [sym, freq] : sorted_freq) {
             pq.push(std::make_unique<HuffmanNode>(sym, freq));
         }
 
