@@ -152,7 +152,7 @@ pufferfish/
 ## 📚 Further Reading
 
 For a deeper dive into the math and architecture behind the project:
-- [**Complete Code Explanation**](docs/explanation.md): A comprehensive guide detailing the project's architecture, data flows (compress/extract/analyze), syntax explanations, and the mathematical concepts mapped to the code.
+- [**Complete Code Explanation**](docs/explanation.md) · [English Version](docs/explanation_en.md): A comprehensive guide detailing the project's architecture, data flows (compress/extract/analyze), syntax explanations, and the mathematical concepts mapped to the code.
 - [**The Algorithm**](docs/algorithm.md): Step-by-step walkthrough of Huffman Coding, including a manual trace of building a tree and calculating entropy.
 - [**The `.puff` Format**](docs/archive_format.md): Byte-level specification of the custom binary archive.
 
