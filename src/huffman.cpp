@@ -195,6 +195,7 @@ namespace pufferfish {
                 throw std::runtime_error("Unexpected end of bitstream");
             }
             current = bit.value() ? current->right.get() : current->left.get();
+
             if (!current) {
                 throw std::runtime_error("Invalid Huffman tree path");
             }
